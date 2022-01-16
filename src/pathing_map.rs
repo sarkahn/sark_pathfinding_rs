@@ -4,30 +4,31 @@ use smallvec::SmallVec;
 /// Trait for defining how the pathfinding algorithm navigates your map.
 pub trait PathingMap<T: Eq> {
     /// Returns the list of valid exits from a given cell.
-    fn get_available_exits(&self, p: T) -> SmallVec<[T;8]>;
+    fn get_available_exits(&self, p: T) -> SmallVec<[T; 8]>;
     /// The cost of moving between two adjacent points.
     fn get_cost(&self, a: T, b: T) -> usize;
     /// The distance between two points.
     fn get_distance(&self, a: T, b: T) -> usize;
 }
 
-pub const ADJACENT_4_WAY: [[i32;2];4] = [
-    [ 0,-1],
-    [ 1, 0],
-    [ 0, 1],
-    [-1, 0],
+#[rustfmt::skip]
+pub const ADJACENT_4_WAY: [[i32; 2]; 4] = [
+    [0, -1], 
+    [1, 0], 
+    [0, 1], 
+    [-1, 0]
 ];
 
-pub const ADJACENT_8_WAY: [[i32;2];8] = [
-    [ 0,-1],
-    [ 1, 0],
-    [ 0, 1],
+pub const ADJACENT_8_WAY: [[i32; 2]; 8] = [
+    [0, -1],
+    [1, 0],
+    [0, 1],
     [-1, 0],
-    [-1,-1],
-    [ 1,-1],
+    [-1, -1],
+    [1, -1],
     [-1, 1],
-    [ 1, 1],
-];  
+    [1, 1],
+];
 
 /// A simple 2d path map.
 pub struct PathMap2d {
@@ -35,8 +36,8 @@ pub struct PathMap2d {
     size: UVec2,
 }
 
-impl PathingMap<[i32;2]> for PathMap2d {
-    fn get_available_exits(&self, p: [i32;2]) -> smallvec::SmallVec<[[i32;2];8]> {
+impl PathingMap<[i32; 2]> for PathMap2d {
+    fn get_available_exits(&self, p: [i32; 2]) -> smallvec::SmallVec<[[i32; 2]; 8]> {
         let mut output = SmallVec::new();
         let xy = IVec2::from(p);
 
@@ -55,40 +56,39 @@ impl PathingMap<[i32;2]> for PathMap2d {
         output
     }
 
-    fn get_cost(&self, _a: [i32;2], _b: [i32;2]) -> usize {
+    fn get_cost(&self, _a: [i32; 2], _b: [i32; 2]) -> usize {
         1
     }
 
-    fn get_distance(&self, a: [i32;2], b: [i32;2]) -> usize {
+    fn get_distance(&self, a: [i32; 2], b: [i32; 2]) -> usize {
         // Manhattan distance
         ((a[0] - b[0]).abs() + (a[1] - b[1]).abs()) as usize
     }
 }
 
 impl PathMap2d {
-    pub fn new(size: [u32;2]) -> Self {
+    pub fn new(size: [u32; 2]) -> Self {
         Self {
             tiles: vec![false; (size[0] * size[1]) as usize],
             size: UVec2::from(size),
         }
     }
 
-    pub fn to_index(&self, xy: [i32;2]) -> usize {
+    pub fn to_index(&self, xy: [i32; 2]) -> usize {
         xy[1] as usize * self.width() + xy[0] as usize
     }
 
     pub fn to_xy(&self, index: usize) -> IVec2 {
         let x = index % self.width();
         let y = index / self.width();
-        IVec2::new(x as i32,y as i32)
-
+        IVec2::new(x as i32, y as i32)
     }
-    pub fn in_bounds(&self, xy: [i32;2]) -> bool {
-        let [x,y] = xy;
+    pub fn in_bounds(&self, xy: [i32; 2]) -> bool {
+        let [x, y] = xy;
         x >= 0 && x < self.width() as i32 && y >= 0 && y < self.height() as i32
     }
 
-    pub fn is_obstacle(&self, xy: [i32;2]) -> bool {
+    pub fn is_obstacle(&self, xy: [i32; 2]) -> bool {
         self.tiles[self.to_index(xy)]
     }
 
@@ -112,11 +112,11 @@ impl PathMap2d {
         self.tiles[i] = !self.tiles[i]
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=bool> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = bool> + '_ {
         self.tiles.iter().cloned()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut bool> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut bool> {
         self.tiles.iter_mut()
     }
 }
