@@ -1,7 +1,7 @@
 use glam::{IVec2, UVec2};
 use smallvec::SmallVec;
 
-/// Trait for defining how the pathfinding algorithm reads your map.
+/// Trait for defining how the pathfinding algorithm navigates your map.
 pub trait PathingMap<T: Eq> {
     /// Returns the list of valid exits from a given cell.
     fn get_available_exits(&self, p: T) -> SmallVec<[T;8]>;

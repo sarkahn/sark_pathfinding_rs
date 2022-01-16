@@ -6,7 +6,7 @@ homepage = "https://github.com/sarkahn/sark_pathfinding"
 repository = "https://github.com/sarkahn/sark_pathfinding"
 license = "MIT"
 readme = "README.md"
-description = "A simple implementation of the pathfinding algorthim from red blob games https://www.redblobgames.com/pathfinding/a-star/implementation.html"
+description = "A simple implementation of the astar pathfinding algorthim from red blob games https://www.redblobgames.com/pathfinding/a-star/implementation.html."
 keywords = ["bevy", "pathfinding", "2d"]
 
 [dependencies]

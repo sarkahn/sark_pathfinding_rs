@@ -1,43 +1,27 @@
+//! A simple implementation of the [astar pathfinding algorithm](https://www.redblobgames.com/pathfinding/a-star/implementation.html) 
+//! from red blob games.
+//! 
+//! In order to use the pathfinder you must have a path map for it to navigate. You can
+//! define one by implementing the [PathingMap] trait, or you can use the built-in
+//! [PathMap2d].
+//! 
+//! # Example
+//! 
+//! ```rust
+//! use sark_pathfinding::*;
+//! 
+//! let map = PathMap2d::new([50,50]);
+//! let mut astar = AStar::from_size([50,50]);
+//! 
+//! let path = astar.find_path(&map, [4,4], [10,10]).unwrap();
+//! ```
+
 pub mod pathing_map;
 
+use ahash::RandomState;
 use std::{collections::{binary_heap::BinaryHeap, HashMap}, hash::Hash};
 
-use ahash::RandomState;
-pub use pathing_map::PathingMap;
-
-#[derive(Eq)]
-struct Cell<T: Eq + Hash + Copy> {
-    cost: usize,
-    value: T,
-}
-
-impl<T: Eq + Hash + Copy> Cell<T> {
-    pub fn new(value: T, cost: usize) -> Self {
-        Self {
-            value,
-            cost,
-        }
-    }
-}
-
-impl<T: Eq + Hash + Copy> PartialOrd for Cell<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: Eq + Hash + Copy> Ord for Cell<T> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.cost.cmp(&self.cost)
-        //.then_with(||other.value.cmp(&self.value))
-    }
-}
-
-impl<T: Eq + Hash + Copy> PartialEq for Cell<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.cost == other.cost && self.value == other.value
-    }
-}
+pub use pathing_map::{PathingMap, PathMap2d};
 
 #[derive(Default)]
 pub struct AStar<T: Eq + Hash + Copy> {
@@ -140,6 +124,41 @@ impl<T: Ord + Eq + Hash + Copy> From<AStar<T>> for Vec<T> {
     }
 }
 
+#[derive(Eq)]
+struct Cell<T: Eq + Hash + Copy> {
+    cost: usize,
+    value: T,
+}
+
+impl<T: Eq + Hash + Copy> Cell<T> {
+    pub fn new(value: T, cost: usize) -> Self {
+        Self {
+            value,
+            cost,
+        }
+    }
+}
+
+impl<T: Eq + Hash + Copy> PartialOrd for Cell<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<T: Eq + Hash + Copy> Ord for Cell<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.cost.cmp(&self.cost)
+        //.then_with(||other.value.cmp(&self.value))
+    }
+}
+
+impl<T: Eq + Hash + Copy> PartialEq for Cell<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cost == other.cost && self.value == other.value
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     use crate::pathing_map::{PathMap2d};
@@ -155,6 +174,7 @@ mod test {
 
         assert_eq!(6, path.len());
         assert_eq!([0,0], path[0]);
+        assert_eq!([5,0], path[5]);
     }
 
     #[test]
@@ -165,6 +185,8 @@ mod test {
         let path = astar.find_path(&map, [5,5], [5,0]).unwrap();
 
         assert_eq!(6, path.len());
+        assert_eq!([5,5], path[0]);
+        assert_eq!([5,0], path[5]);
     }
     
     #[test]
@@ -175,6 +197,8 @@ mod test {
         let path = astar.find_path(&map, [5,4], [5,9]).unwrap();
 
         assert_eq!(6, path.len());
+        assert_eq!([5,4], path[0]);
+        assert_eq!([5,9], path[5]);
     }
 
     #[test]
@@ -185,6 +209,8 @@ mod test {
         let path = astar.find_path(&map, [9,5], [4,5]).unwrap();
 
         assert_eq!(6, path.len());
+        assert_eq!([9,5], path[0]);
+        assert_eq!([4,5], path[5]);
     }
 
 }
