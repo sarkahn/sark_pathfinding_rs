@@ -1,6 +1,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Crates.io](https://img.shields.io/crates/v/sark_pathfinding_rs)](https://crates.io/crates/sark_pathfinding_rs/)
-[![docs](https://docs.rs/sark_pathfinding_rs/badge.svg)](https://docs.rs/sark_pathfinding_rs/)
+[![Crates.io](https://img.shields.io/crates/v/sark_pathfinding)](https://crates.io/crates/sark_pathfinding/)
+[![docs](https://docs.rs/sark_pathfinding/badge.svg)](https://docs.rs/sark_pathfinding/)
 
 A simple implementation of the [astar pathfinding algorithm](https://www.redblobgames.com/pathfinding/a-star/implementation.html) 
 from red blob games.
