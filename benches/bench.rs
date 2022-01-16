@@ -13,7 +13,7 @@ mod tests {
         let size = [500, 500];
         let map = PathMap2d::new(size);
 
-        let mut astar = AStar::from_size(size);
+        let mut astar = AStar::new(10);
         b.iter(|| {
             astar.find_path(&map, [0, 0], [499, 499]);
         });

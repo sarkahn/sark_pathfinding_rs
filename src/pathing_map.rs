@@ -1,10 +1,18 @@
 use glam::{IVec2, UVec2};
-use smallvec::SmallVec;
+
+use arrayvec::{ArrayVec, IntoIter};
 
 /// Trait for defining how the pathfinding algorithm navigates your map.
+/// 
+/// # Generic Paramters
+/// - `T` is whatever your representation of a point in space is. IE: For a 2d pathing map,
+///   it might be `[i32;2]`, or `IVec2`
+/// - `Neighbours` is the iterator returned by the `get_available_exits` function, which
+///   the pathfinder uses to find neighbours for a given cell.
 pub trait PathingMap<T: Eq> {
+    type Neighbours: Iterator<Item=T>;
     /// Returns the list of valid exits from a given cell.
-    fn get_available_exits(&self, p: T) -> SmallVec<[T; 8]>;
+    fn get_available_exits(&self, p: T) -> Self::Neighbours;
     /// The cost of moving between two adjacent points.
     fn get_cost(&self, a: T, b: T) -> usize;
     /// The distance between two points.
@@ -31,14 +39,18 @@ pub const ADJACENT_8_WAY: [[i32; 2]; 8] = [
 ];
 
 /// A simple 2d path map.
+/// 
+/// Uses `ArrayVec` to avoid allocations when returning neighbours for a cell.
 pub struct PathMap2d {
     tiles: Vec<bool>,
     size: UVec2,
 }
 
 impl PathingMap<[i32; 2]> for PathMap2d {
-    fn get_available_exits(&self, p: [i32; 2]) -> smallvec::SmallVec<[[i32; 2]; 8]> {
-        let mut output = SmallVec::new();
+    type Neighbours=IntoIter<[i32;2], 8>;
+
+    fn get_available_exits(&self, p: [i32; 2]) -> Self::Neighbours {
+        let mut v = ArrayVec::<_, 8>::new();
         let xy = IVec2::from(p);
 
         for dir in ADJACENT_8_WAY {
@@ -49,11 +61,11 @@ impl PathingMap<[i32; 2]> for PathMap2d {
                 continue;
             }
 
-            if !self.is_obstacle([next.x, next.y]) {
-                output.push(next.into());
+            if !self.is_obstacle(next.into()) {
+                v.push(next.into());
             }
         }
-        output
+        v.into_iter()
     }
 
     fn get_cost(&self, _a: [i32; 2], _b: [i32; 2]) -> usize {
@@ -64,6 +76,7 @@ impl PathingMap<[i32; 2]> for PathMap2d {
         // Manhattan distance
         ((a[0] - b[0]).abs() + (a[1] - b[1]).abs()) as usize
     }
+
 }
 
 impl PathMap2d {

@@ -2124,9 +2124,10 @@ dependencies = [
 
 [[package]]
 name = "sark_pathfinding"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "ahash",
+ "arrayvec",
  "bevy",
  "bevy_ascii_terminal",
  "bevy_tiled_camera",

@@ -11,8 +11,7 @@
 //! use sark_pathfinding::*;
 //!
 //! let map = PathMap2d::new([50,50]);
-//! // The length of the astar object must match your map.
-//! let mut astar = AStar::from_size([50,50]);
+//! let mut astar = AStar::new(20);
 //!
 //! let path = astar.find_path(&map, [4,4], [10,10]).unwrap();
 //! ```
@@ -27,6 +26,9 @@ use std::{
 
 pub use pathing_map::{PathMap2d, PathingMap};
 
+/// Struct for running the pathfinding algorithm.
+/// 
+/// The `T` parameter is whatver your representation of a point in space is.
 #[derive(Default)]
 pub struct AStar<T: Eq + Hash + Copy> {
     frontier: BinaryHeap<Cell<T>>,
@@ -36,6 +38,11 @@ pub struct AStar<T: Eq + Hash + Copy> {
 }
 
 impl<T: Eq + Hash + Copy> AStar<T> {
+    /// Create a new astar object for pathfinding.
+    /// 
+    /// The `length` parameter determines the initial size of the internal containers. These
+    /// containers will grow as needed when running the pathfinding algorithm, but setting a
+    /// reasonable initial size could avoid performance issues from excessive allocations.
     pub fn new(len: usize) -> Self {
         Self {
             frontier: BinaryHeap::with_capacity(len),
@@ -46,6 +53,10 @@ impl<T: Eq + Hash + Copy> AStar<T> {
     }
 
     /// Construct an astar struct from the given size (width * height).
+    /// 
+    /// The `size` parameter determines the initial size of the internal containers. These
+    /// containers will grow as needed when running the pathfinding algorithm, but setting a
+    /// reasonable initial size could avoid performance issues from excessive allocations.
     pub fn from_size(size: [u32; 2]) -> Self {
         Self::new(size[0] as usize * size[1] as usize)
     }
