@@ -1,0 +1,21 @@
+[package]
+name = "sark_pathfinding"
+version = "0.1.0"
+edition = "2021"
+homepage = "https://github.com/sarkahn/sark_pathfinding"
+repository = "https://github.com/sarkahn/sark_pathfinding"
+license = "MIT"
+readme = "README.md"
+description = "A simple implementation of the pathfinding algorthim from red blob games https://www.redblobgames.com/pathfinding/a-star/implementation.html"
+keywords = ["bevy", "pathfinding", "2d"]
+
+[dependencies]
+glam = { version = "0.20.0" }
+smallvec = "1.7.0"
+ahash = "0.7.6"
+
+[dev-dependencies]
+bevy = {version = "0.6", default-features = false, features = ["png", "bevy_winit", "render"]}
+bevy_ascii_terminal = "0.9.0"
+bevy_tiled_camera = "0.3.0"
+noise = "0.7.0"
