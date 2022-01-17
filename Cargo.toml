@@ -7,7 +7,7 @@ repository = "https://github.com/sarkahn/sark_pathfinding_rs"
 license = "MIT"
 readme = "README.md"
 description = "A simple implementation of the astar pathfinding algorthim from red blob games https://www.redblobgames.com/pathfinding/a-star/implementation.html."
-keywords = ["bevy", "pathfinding", "2d"]
+keywords = ["bevy", "pathfinding", "2d", "astar"]
 
 [dependencies]
 glam = { version = "0.20.0" }
