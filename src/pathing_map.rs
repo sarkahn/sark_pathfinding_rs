@@ -1,6 +1,6 @@
-use glam::{IVec2, UVec2};
+use glam::{IVec2, UVec2, const_ivec2};
 
-use arrayvec::{ArrayVec, IntoIter};
+pub use arrayvec::{ArrayVec, IntoIter};
 
 /// Trait for defining how the pathfinding algorithm navigates your map.
 /// 
@@ -20,22 +20,22 @@ pub trait PathingMap<T: Eq> {
 }
 
 #[rustfmt::skip]
-pub const ADJACENT_4_WAY: [[i32; 2]; 4] = [
-    [0, -1], 
-    [1, 0], 
-    [0, 1], 
-    [-1, 0]
+pub const ADJACENT_4_WAY: [IVec2; 4] = [
+    const_ivec2!([ 0,-1]),
+    const_ivec2!([ 1, 0]),
+    const_ivec2!([ 0, 1]),
+    const_ivec2!([-1, 0]),
 ];
 
-pub const ADJACENT_8_WAY: [[i32; 2]; 8] = [
-    [0, -1],
-    [1, 0],
-    [0, 1],
-    [-1, 0],
-    [-1, -1],
-    [1, -1],
-    [-1, 1],
-    [1, 1],
+pub const ADJACENT_8_WAY: [IVec2; 8] = [
+    const_ivec2!([ 0,-1]),
+    const_ivec2!([ 1, 0]),
+    const_ivec2!([ 0, 1]),
+    const_ivec2!([-1, 0]),
+    const_ivec2!([-1,-1]),
+    const_ivec2!([ 1,-1]),
+    const_ivec2!([-1, 1]),
+    const_ivec2!([ 1, 1]),
 ];
 
 /// A simple 2d path map.
@@ -54,7 +54,6 @@ impl PathingMap<[i32; 2]> for PathMap2d {
         let xy = IVec2::from(p);
 
         for dir in ADJACENT_8_WAY {
-            let dir = IVec2::from(dir);
             let next = xy + dir;
 
             if !self.in_bounds(next.into()) {
