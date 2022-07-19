@@ -5,18 +5,21 @@
 A simple implementation of the [astar pathfinding algorithm](https://www.redblobgames.com/pathfinding/a-star/implementation.html) 
 from red blob games.
 
-In order to use the pathfinder you must have a path map for it to navigate. You can
-define one by implementing the `PathingMap` trait, or you can use the built-in
-`PathMap2d`.
+In order to use the pathfinder you must have a path map for it to navigate. You can define one by implementing the `PathingMap` trait, or you can use the built-in `PathMap2d`.
 
 # Example
 
 ```rust
 use sark_pathfinding::*;
 
-let map = PathMap2d::new([50,50]);
-let mut astar = AStar::from_size([50,50]);
+// Create a 50x50 map with all nodes set to false (no obstacles)
+let mut map = PathMap2d::default([50,50]);
 
+// Create an obstacle at position [5,5]
+map[[5,5]] = true;
+
+// Find our path
+let mut astar = AStar::from_size([50,50]);
 let path = astar.find_path(&map, [4,4], [10,10]).unwrap();
 ```
 
