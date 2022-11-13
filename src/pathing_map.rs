@@ -1,17 +1,16 @@
-use glam::{IVec2, UVec2, const_ivec2};
-
 pub use arrayvec::{ArrayVec, IntoIter};
+use glam::{IVec2, UVec2};
 
 /// Trait for defining how the pathfinding algorithm navigates your map.
-/// 
+///
 /// # Generic Paramters
 /// - `T` is whatever your representation of a point in space is. IE: For a 2d pathing map,
 ///   it might be `[i32;2]`, or `IVec2`
 /// - `Neighbours` is the iterator returned by the `get_available_exits` function, which
 ///   the pathfinder uses to find neighbours for a given cell.
 pub trait PathingMap<T: Eq> {
-    type Neighbours: Iterator<Item=T>;
-    /// Returns the list of valid exits from a given cell.
+    type Neighbours: Iterator<Item = T>;
+    /// Returns an iterator of the valid exits from a given cell.
     fn get_available_exits(&self, p: T) -> Self::Neighbours;
     /// The cost of moving between two adjacent points.
     fn get_cost(&self, a: T, b: T) -> usize;
@@ -21,25 +20,26 @@ pub trait PathingMap<T: Eq> {
 
 #[rustfmt::skip]
 pub const ADJACENT_4_WAY: [IVec2; 4] = [
-    const_ivec2!([ 0,-1]),
-    const_ivec2!([ 1, 0]),
-    const_ivec2!([ 0, 1]),
-    const_ivec2!([-1, 0]),
+    IVec2::from_array([ 0,-1]),
+    IVec2::from_array([ 1, 0]),
+    IVec2::from_array([ 0, 1]),
+    IVec2::from_array([-1, 0]),
 ];
 
+#[rustfmt::skip]
 pub const ADJACENT_8_WAY: [IVec2; 8] = [
-    const_ivec2!([ 0,-1]),
-    const_ivec2!([ 1, 0]),
-    const_ivec2!([ 0, 1]),
-    const_ivec2!([-1, 0]),
-    const_ivec2!([-1,-1]),
-    const_ivec2!([ 1,-1]),
-    const_ivec2!([-1, 1]),
-    const_ivec2!([ 1, 1]),
+    IVec2::from_array([ 0,-1]),
+    IVec2::from_array([ 1, 0]),
+    IVec2::from_array([ 0, 1]),
+    IVec2::from_array([-1, 0]),
+    IVec2::from_array([-1,-1]),
+    IVec2::from_array([ 1,-1]),
+    IVec2::from_array([-1, 1]),
+    IVec2::from_array([ 1, 1]),
 ];
 
 /// A simple 2d path map.
-/// 
+///
 /// Uses `ArrayVec` to avoid allocations when returning neighbours for a cell.
 pub struct PathMap2d {
     tiles: Vec<bool>,
@@ -47,7 +47,7 @@ pub struct PathMap2d {
 }
 
 impl PathingMap<[i32; 2]> for PathMap2d {
-    type Neighbours=IntoIter<[i32;2], 8>;
+    type Neighbours = IntoIter<[i32; 2], 8>;
 
     fn get_available_exits(&self, p: [i32; 2]) -> Self::Neighbours {
         let mut v = ArrayVec::<_, 8>::new();
@@ -75,7 +75,6 @@ impl PathingMap<[i32; 2]> for PathMap2d {
         // Manhattan distance
         ((a[0] - b[0]).abs() + (a[1] - b[1]).abs()) as usize
     }
-
 }
 
 impl PathMap2d {
@@ -86,22 +85,22 @@ impl PathMap2d {
         }
     }
 
+    #[inline(always)]
     pub fn to_index(&self, xy: [i32; 2]) -> usize {
         xy[1] as usize * self.width() + xy[0] as usize
     }
 
+    #[inline(always)]
     pub fn to_xy(&self, index: usize) -> IVec2 {
         let x = index % self.width();
         let y = index / self.width();
         IVec2::new(x as i32, y as i32)
     }
+
+    #[inline(always)]
     pub fn in_bounds(&self, xy: [i32; 2]) -> bool {
         let [x, y] = xy;
         x >= 0 && x < self.width() as i32 && y >= 0 && y < self.height() as i32
-    }
-
-    pub fn is_obstacle(&self, xy: [i32; 2]) -> bool {
-        self.tiles[self.to_index(xy)]
     }
 
     pub fn width(&self) -> usize {
@@ -116,18 +115,37 @@ impl PathMap2d {
         self.size
     }
 
+    #[inline(always)]
+    pub fn is_obstacle(&self, xy: [i32; 2]) -> bool {
+        self.tiles[self.to_index(xy)]
+    }
+
+    #[inline(always)]
     pub fn is_obstacle_index(&self, i: usize) -> bool {
         self.tiles[i]
     }
 
+    #[inline(always)]
     pub fn toggle_obstacle_index(&mut self, i: usize) {
         self.tiles[i] = !self.tiles[i]
     }
 
+    #[inline(always)]
+    pub fn set_obstacle(&mut self, xy: [i32; 2], is_obstacle: bool) {
+        self.set_obstacle_index(self.to_index(xy), is_obstacle);
+    }
+
+    #[inline(always)]
+    pub fn set_obstacle_index(&mut self, i: usize, is_obstacle: bool) {
+        self.tiles[i] = is_obstacle;
+    }
+
+    #[inline(always)]
     pub fn iter(&self) -> impl Iterator<Item = bool> + '_ {
         self.tiles.iter().cloned()
     }
 
+    #[inline(always)]
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut bool> {
         self.tiles.iter_mut()
     }

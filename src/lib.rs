@@ -15,7 +15,7 @@
 //!
 //! let path = astar.find_path(&map, [4,4], [10,10]).unwrap();
 //! ```
-
+#![feature(let_chains)]
 pub mod pathing_map;
 
 use ahash::RandomState;
@@ -27,7 +27,7 @@ use std::{
 pub use pathing_map::{PathMap2d, PathingMap};
 
 /// Struct for running the pathfinding algorithm.
-/// 
+///
 /// The `T` parameter is whatver your representation of a point in space is.
 #[derive(Default)]
 pub struct AStar<T: Eq + Hash + Copy> {
@@ -39,7 +39,7 @@ pub struct AStar<T: Eq + Hash + Copy> {
 
 impl<T: Eq + Hash + Copy> AStar<T> {
     /// Create a new astar object for pathfinding.
-    /// 
+    ///
     /// The `length` parameter determines the initial size of the internal containers. These
     /// containers will grow as needed when running the pathfinding algorithm, but setting a
     /// reasonable initial size could avoid performance issues from excessive allocations.
@@ -53,7 +53,7 @@ impl<T: Eq + Hash + Copy> AStar<T> {
     }
 
     /// Construct an astar struct from the given size (width * height).
-    /// 
+    ///
     /// The `size` parameter determines the initial size of the internal containers. These
     /// containers will grow as needed when running the pathfinding algorithm, but setting a
     /// reasonable initial size could avoid performance issues from excessive allocations.
@@ -123,7 +123,7 @@ impl<T: Eq + Hash + Copy> AStar<T> {
 
     /// An iterator over all nodes visited during pathfinding.
     pub fn visited(&self) -> impl Iterator<Item = T> + '_ {
-        self.parents.iter().map(|(k, _)| k).cloned()
+        self.parents.keys().cloned()
     }
 
     /// Retrieve the result of the pathfinding operation.

@@ -1,6 +1,6 @@
+#![feature(let_chains)]
 use bevy::{prelude::*, utils::Instant};
-use bevy_ascii_terminal::*;
-use bevy_tiled_camera::*;
+use bevy_ascii_terminal::{prelude::*, TiledCamera};
 use noise::{
     utils::{NoiseMapBuilder, PlaneMapBuilder},
     Fbm, MultiFractal,
@@ -26,18 +26,18 @@ const FLOOR_TILE: Tile = Tile {
     fg_color: Color::WHITE,
     bg_color: Color::BLACK,
 };
-const TEXT_FMT: StringFormat = StringFormat {
-    fg_color: Color::YELLOW_GREEN,
-    bg_color: Color::BLACK,
-    pivot: Pivot::TopLeft,
-};
+// const TEXT_FMT: StringFormat = StringFormat {
+//     fg_color: Color::YELLOW_GREEN,
+//     bg_color: Color::BLACK,
+//     pivot: Pivot::TopLeft,
+// };
 
 enum InputCommand {
     ToggleWall((IVec2, usize)),
     SetPath((IVec2, usize)),
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 struct PathingState {
     start: Option<IVec2>,
     end: Option<IVec2>,
@@ -55,55 +55,62 @@ impl PathingState {
 
 fn setup(mut commands: Commands) {
     let size = [120, 60];
-    commands.spawn_bundle(TerminalBundle::new().with_size(size));
+    commands.spawn((TerminalBundle::new().with_size(size), AutoCamera));
 
-    commands.spawn_bundle(TiledCameraBundle::new().with_tile_count(size));
+    let mut map = PathMap(PathMap2d::new([120, 60]));
 
-    let mut map = PathMap2d::new([120, 60]);
-
-    build_walls(&mut map);
+    build_walls(&mut map.0);
 
     commands.insert_resource(map);
     commands.insert_resource(PathingState::default());
 }
 
+#[derive(Resource)]
+pub struct PathMap(PathMap2d);
+
+impl std::ops::Deref for PathMap {
+    type Target = PathMap2d;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 fn input_to_commands(
     input: Res<Input<MouseButton>>,
     windows: Res<Windows>,
-    q_cam: Query<(&Camera, &GlobalTransform, &TiledProjection)>,
-    map: Res<PathMap2d>,
+    q_cam: Query<(&Camera, &GlobalTransform, &TiledCamera)>,
+    map: Res<PathMap>,
     mut input_writer: EventWriter<InputCommand>,
 ) {
-    let window = windows.get_primary().unwrap();
-    if let Some(cursor_pos) = window.cursor_position() {
-        let (cam, t, proj) = q_cam.single();
+    if let Some(window) = windows.get_primary()
+    && let Some(cursor_pos) = window.cursor_position()
+    && let Ok((cam, t, tcam)) = q_cam.get_single()
+    && let Some(pos) = tcam.screen_to_world(cursor_pos, cam, t) {
+        let pos = world_to_map(&map, pos.extend(0.0));
+        if !map.in_bounds(pos.into()) {
+            return;
+        }
+        let i = map.to_index(pos.into());
+        if input.just_pressed(MouseButton::Left) {
+            input_writer.send(InputCommand::ToggleWall((pos, i)));
+        }
 
-        if let Some(pos) = proj.screen_to_world(cam, &windows, t, cursor_pos) {
-            let pos = world_to_map(&map, pos);
-            if !map.in_bounds(pos.into()) {
-                return;
-            }
-            let i = map.to_index(pos.into());
-            if input.just_pressed(MouseButton::Left) {
-                input_writer.send(InputCommand::ToggleWall((pos, i)));
-            }
-
-            if input.just_pressed(MouseButton::Right) {
-                input_writer.send(InputCommand::SetPath((pos, i)));
-            }
+        if input.just_pressed(MouseButton::Right) {
+            input_writer.send(InputCommand::SetPath((pos, i)));
         }
     }
 }
 
 fn read_inputs(
     mut evt: EventReader<InputCommand>,
-    mut map: ResMut<PathMap2d>,
+    mut map: ResMut<PathMap>,
     mut path: ResMut<PathingState>,
 ) {
     for evt in evt.iter() {
         match evt {
             InputCommand::ToggleWall((_, i)) => {
-                map.toggle_obstacle_index(*i);
+                map.0.toggle_obstacle_index(*i);
             }
             InputCommand::SetPath((pos, _)) => {
                 if path.start.is_some() {
@@ -122,7 +129,7 @@ fn read_inputs(
     }
 }
 
-fn update_path(map: Res<PathMap2d>, mut path: ResMut<PathingState>) {
+fn update_path(map: Res<PathMap>, mut path: ResMut<PathingState>) {
     if !map.is_changed() && !path.is_changed() {
         return;
     }
@@ -131,7 +138,7 @@ fn update_path(map: Res<PathMap2d>, mut path: ResMut<PathingState>) {
         if let Some(end) = path.end {
             path.astar.clear();
             let time = Instant::now();
-            path.astar.find_path(&*map, start.into(), end.into());
+            path.astar.find_path(&map.0, start.into(), end.into());
             path.time = time.elapsed().as_secs_f32();
         }
     }
@@ -143,7 +150,7 @@ fn world_to_map(map: &PathMap2d, pos: Vec3) -> IVec2 {
     pos + size / 2
 }
 
-fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap2d>, path_state: Res<PathingState>) {
+fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, path_state: Res<PathingState>) {
     if !map.is_changed() && !path_state.is_changed() {
         return;
     }
@@ -158,64 +165,57 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap2d>, path_state: Res<P
     }
 
     for p in path_state.astar.visited() {
-        let fmt = CharFormat::new(Color::RED, Color::BLACK);
-
         let c = match map.is_obstacle(p) {
             true => WALL_TILE.glyph,
             false => '.',
         };
-        term.put_char_formatted(p, c, fmt);
+        term.put_char(p, c.fg(Color::RED).bg(Color::BLACK));
     }
 
+    let fg = Color::YELLOW_GREEN;
     if let Some(path) = path_state.astar.path() {
         for (i, p) in path.iter().enumerate() {
             let t = i as f32 / (path.len() - 2) as f32;
             let col = color_lerp(START_COLOR, END_COLOR, t);
-            let fmt = CharFormat::new(col, Color::BLACK);
-            term.put_char_formatted(*p, '█', fmt);
+            term.put_char(*p, '█'.fg(col));
         }
-        term.put_string_formatted(
-            [0, 2],
+        term.put_string(
+            [0, 2].pivot(Pivot::TopLeft),
             format!(
                 "Found path in {} ms. Length {}. Visited {} nodes.         ",
                 path_state.time,
                 path.len(),
                 path_state.astar.visited().count()
             )
-            .as_str(),
-            TEXT_FMT,
+            .as_str()
+            .fg(fg),
         );
     } else {
-        term.put_string_formatted(
-            [0, 2],
-            "No valid path found                      ",
-            TEXT_FMT,
+        term.put_string(
+            [0, 2].pivot(Pivot::TopLeft),
+            "No valid path found                      ".fg(fg),
         );
     }
 
     if let Some(start) = path_state.start {
-        let fmt = CharFormat::new(Color::BLUE, Color::BLACK);
-        term.put_char_formatted(start.into(), 'S', fmt);
+        term.put_char(start, 'S'.fg(Color::BLUE));
     }
 
     if let Some(end) = path_state.end {
-        term.put_char(end.into(), 'E');
+        term.put_char(end, 'E');
     }
 
-    term.put_string_formatted(
-        [0, 0],
-        "Left Click to toggle walls                  ",
-        TEXT_FMT,
+    term.put_string(
+        [0, 0].pivot(Pivot::TopLeft),
+        "Left Click to toggle walls                  ".fg(fg),
     );
-    term.put_string_formatted(
-        [0, 1],
-        "Right click to set path start/end points    ",
-        TEXT_FMT,
+    term.put_string(
+        [0, 1].pivot(Pivot::TopLeft),
+        "Right click to set path start/end points    ".fg(fg),
     );
-    term.put_string_formatted(
-        [0, 3],
-        "                                            ",
-        TEXT_FMT,
+    term.put_string(
+        [0, 3].pivot(Pivot::TopLeft),
+        "                                            ".fg(fg),
     );
 }
 
@@ -258,7 +258,6 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(TerminalPlugin)
-        .add_plugin(TiledCameraPlugin)
         .add_startup_system(setup)
         .add_system(input_to_commands)
         .add_system(read_inputs)
