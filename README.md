@@ -25,4 +25,4 @@ let path = pf.astar(&map, [4,4], [10,10]).unwrap();
 
 ![](images/pathfind_demo.gif)
 
-*From the "terminal" example.*//! A simple implementation of the [astar pathfinding algorithm](https://www.redblobgames.com/pathfinding/a-star/implementation.html)
+*From the "terminal" example.*
