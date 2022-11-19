@@ -5,7 +5,7 @@ extern crate test;
 #[cfg(test)]
 mod tests {
     use crate::*;
-    use sark_pathfinding::{pathing_map::PathMap2d, *};
+    use sark_pathfinding::*;
     use test::Bencher;
 
     #[bench]
@@ -13,9 +13,9 @@ mod tests {
         let size = [500, 500];
         let map = PathMap2d::new(size);
 
-        let mut astar = AStar::new(10);
+        let mut astar = Pathfinder::new();
         b.iter(|| {
-            astar.find_path(&map, [0, 0], [499, 499]);
+            astar.astar(&map, [0, 0], [499, 499]);
         });
     }
 }

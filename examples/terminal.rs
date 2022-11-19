@@ -5,7 +5,7 @@ use noise::{
     utils::{NoiseMapBuilder, PlaneMapBuilder},
     Fbm, MultiFractal,
 };
-use sark_pathfinding::{pathing_map::PathMap2d, AStar};
+use sark_pathfinding::{pathmap::PathMap2d, Pathfinder};
 
 pub const START_COLOR: Color = Color::BLUE;
 pub const END_COLOR: Color = Color::GREEN;
@@ -37,11 +37,14 @@ enum InputCommand {
     SetPath((IVec2, usize)),
 }
 
+#[derive(Resource)]
+pub struct PathMap(PathMap2d);
+
 #[derive(Default, Resource)]
 struct PathingState {
     start: Option<IVec2>,
     end: Option<IVec2>,
-    astar: AStar<[i32; 2]>,
+    pathfinder: Pathfinder,
     time: f32,
 }
 
@@ -49,7 +52,7 @@ impl PathingState {
     pub fn clear(&mut self) {
         self.start = None;
         self.end = None;
-        self.astar.clear();
+        self.pathfinder.clear();
     }
 }
 
@@ -57,7 +60,7 @@ fn setup(mut commands: Commands) {
     let size = [120, 60];
     commands.spawn((TerminalBundle::new().with_size(size), AutoCamera));
 
-    let mut map = PathMap(PathMap2d::new([120, 60]));
+    let mut map = PathMap(PathMap2d::new(size));
 
     build_walls(&mut map.0);
 
@@ -65,8 +68,11 @@ fn setup(mut commands: Commands) {
     commands.insert_resource(PathingState::default());
 }
 
-#[derive(Resource)]
-pub struct PathMap(PathMap2d);
+impl std::ops::DerefMut for PathMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 impl std::ops::Deref for PathMap {
     type Target = PathMap2d;
@@ -88,10 +94,10 @@ fn input_to_commands(
     && let Ok((cam, t, tcam)) = q_cam.get_single()
     && let Some(pos) = tcam.screen_to_world(cursor_pos, cam, t) {
         let pos = world_to_map(&map, pos.extend(0.0));
-        if !map.in_bounds(pos.into()) {
+        if !map.in_bounds(pos) {
             return;
         }
-        let i = map.to_index(pos.into());
+        let i = map.transform_lti(pos);
         if input.just_pressed(MouseButton::Left) {
             input_writer.send(InputCommand::ToggleWall((pos, i)));
         }
@@ -110,7 +116,7 @@ fn read_inputs(
     for evt in evt.iter() {
         match evt {
             InputCommand::ToggleWall((_, i)) => {
-                map.0.toggle_obstacle_index(*i);
+                map[*i] = !map[*i];
             }
             InputCommand::SetPath((pos, _)) => {
                 if path.start.is_some() {
@@ -136,9 +142,9 @@ fn update_path(map: Res<PathMap>, mut path: ResMut<PathingState>) {
 
     if let Some(start) = path.start {
         if let Some(end) = path.end {
-            path.astar.clear();
+            path.pathfinder.clear();
             let time = Instant::now();
-            path.astar.find_path(&map.0, start.into(), end.into());
+            path.pathfinder.astar(&map.0, start, end);
             path.time = time.elapsed().as_secs_f32();
         }
     }
@@ -164,16 +170,17 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, path_state: Res<Pat
         }
     }
 
-    for p in path_state.astar.visited() {
-        let c = match map.is_obstacle(p) {
+    for p in path_state.pathfinder.visited() {
+        let c = match map[*p] {
             true => WALL_TILE.glyph,
             false => '.',
         };
-        term.put_char(p, c.fg(Color::RED).bg(Color::BLACK));
+        term.put_char(*p, c.fg(Color::RED).bg(Color::BLACK));
     }
 
     let fg = Color::YELLOW_GREEN;
-    if let Some(path) = path_state.astar.path() {
+    let path = path_state.pathfinder.path();
+    if !path.is_empty() {
         for (i, p) in path.iter().enumerate() {
             let t = i as f32 / (path.len() - 2) as f32;
             let col = color_lerp(START_COLOR, END_COLOR, t);
@@ -185,7 +192,7 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, path_state: Res<Pat
                 "Found path in {} ms. Length {}. Visited {} nodes.         ",
                 path_state.time,
                 path.len(),
-                path_state.astar.visited().count()
+                path_state.pathfinder.visited().count()
             )
             .as_str()
             .fg(fg),

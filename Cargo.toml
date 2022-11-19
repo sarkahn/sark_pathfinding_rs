@@ -1,6 +1,6 @@
 [package]
 name = "sark_pathfinding"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 homepage = "https://github.com/sarkahn/sark_pathfinding_rs"
 repository = "https://github.com/sarkahn/sark_pathfinding_rs"
@@ -14,6 +14,8 @@ glam = { version = "0.22" }
 smallvec = "1.7.0"
 ahash = "0.7.6"
 arrayvec = "0.7.2"
+sark_grids = {path="../sark_grids_rs", version = "0.5.5"}
+
 
 [dev-dependencies]
 bevy = {path="../bevy", version = "0.9", default-features = false, features = ["png", "bevy_winit", "render"]}

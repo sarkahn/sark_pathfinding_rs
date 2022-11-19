@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_ascii_terminal"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "arrayvec",
  "bevy",
@@ -616,7 +616,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_tiled_camera"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "bevy",
  "sark_grids",
@@ -2185,7 +2185,7 @@ checksum = "4501abdff3ae82a1c1b477a17252eb69cee9e66eb915c1abaa4f44d873df9f09"
 
 [[package]]
 name = "sark_grids"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "glam",
  "itertools",
@@ -2193,7 +2193,7 @@ dependencies = [
 
 [[package]]
 name = "sark_pathfinding"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ahash",
  "arrayvec",
@@ -2201,6 +2201,7 @@ dependencies = [
  "bevy_ascii_terminal",
  "glam",
  "noise",
+ "sark_grids",
  "smallvec",
 ]
 

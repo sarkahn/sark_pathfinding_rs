@@ -14,12 +14,15 @@ define one by implementing the `PathingMap` trait, or you can use the built-in
 ```rust
 use sark_pathfinding::*;
 
-let map = PathMap2d::new([50,50]);
-let mut astar = AStar::from_size([50,50]);
+let mut map = PathMap2d::new([50,50]);
+let mut pf = Pathfinder::new();
 
-let path = astar.find_path(&map, [4,4], [10,10]).unwrap();
+// Set position [5,4] of the path map to be a pathfinding obstacle.
+map[5,4] = true;
+
+let path = pf.astar(&map, [4,4], [10,10]).unwrap();
 ```
 
 ![](images/pathfind_demo.gif)
 
-*From the "terminal" example.*
+*From the "terminal" example.*//! A simple implementation of the [astar pathfinding algorithm](https://www.redblobgames.com/pathfinding/a-star/implementation.html)
