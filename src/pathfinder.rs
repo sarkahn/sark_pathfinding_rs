@@ -1,21 +1,18 @@
-use ahash::RandomState;
+use ahash::{HashMap, HashMapExt};
 use glam::IVec2;
 use sark_grids::GridPoint;
-use std::{
-    collections::{binary_heap::BinaryHeap, hash_map::Entry, HashMap},
-    hash::Hash,
-};
+use std::collections::hash_map::Entry;
 
-use crate::pathmap::PathMap;
+use crate::{min_heap::MinHeap, pathmap::PathMap};
 
-/// Struct for running pathfinding algorithms.
-/// 
+/// Utility for pathfinding that supports several simple algorithms.
+///
 /// Maintains internal state so it can be re-used to avoid allocations.
 #[derive(Default)]
 pub struct Pathfinder {
-    frontier: BinaryHeap<Cell<IVec2>>,
-    parents: HashMap<IVec2, IVec2, RandomState>,
-    costs: HashMap<IVec2, i32, RandomState>,
+    frontier: MinHeap,
+    came_from: HashMap<IVec2, IVec2>,
+    costs: HashMap<IVec2, i32>,
     path: Vec<IVec2>,
 }
 
@@ -24,178 +21,180 @@ impl Pathfinder {
         Self::default()
     }
 
-    /// Create a new pathfinder.
-    ///
-    /// The `length` parameter determines the initial size of the internal 
-    /// containers. These containers will grow as needed when running the 
-    /// pathfinding algorithm, but setting a reasonable initial size could avoid 
-    /// performance issues from excessive allocations.
-    pub fn with_capacity(len: usize) -> Self {
+    /// Create a new pathfinder with an initial capacity set for all internal
+    /// data structures.
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            frontier: BinaryHeap::with_capacity(len / 4),
-            parents: HashMap::with_capacity_and_hasher(len / 4, RandomState::default()),
-            costs: HashMap::with_capacity_and_hasher(len / 4, RandomState::default()),
-            path: Vec::with_capacity(len / 4),
+            frontier: MinHeap::with_capacity(capacity),
+            came_from: HashMap::with_capacity(capacity),
+            costs: HashMap::with_capacity(capacity),
+            path: Vec::with_capacity(capacity / 4),
         }
     }
 
-    /// Find a path on the given [PathMap]. Returns `None` if no path could be 
-    /// found.
+    /// Find a path to a goal using the [A*] algorithm.
+    ///
+    /// Returns a slice of points representing the path, or [None] if no path
+    /// can be found.
+    ///
+    /// [A*]: https://www.redblobgames.com/pathfinding/a-star/introduction.html#astar
     pub fn astar(
         &mut self,
         map: &impl PathMap,
         start: impl GridPoint,
-        end: impl GridPoint,
+        goal: impl GridPoint,
     ) -> Option<&[IVec2]> {
         self.clear();
-        let start = start.as_ivec2();
-        let end = end.as_ivec2();
-        self.frontier.push(Cell::new(start, 0));
+        let start = start.to_ivec2();
+        let goal = goal.to_ivec2();
+        self.frontier.push(start, 0);
         self.costs.insert(start, 0);
 
-        while !self.frontier.is_empty() {
-            let curr = self.frontier.pop().unwrap().value;
-
-            if curr == end {
+        while let Some(curr) = self.frontier.pop() {
+            if curr == goal {
                 break;
             }
 
             for next in map.exits(curr) {
-                let new_cost = self.costs[&curr] + map.cost(curr, next);
-
-                let next_cost = self.costs.get(&next);
-
-                if next_cost.is_none() || new_cost < *next_cost.unwrap() {
+                let new_cost = self.costs[&curr] + map.cost(curr, next) as i32;
+                if !self.costs.contains_key(&next) || new_cost < self.costs[&next] {
                     self.costs.insert(next, new_cost);
-                    let priority = new_cost + map.distance(next, end) as i32;
-                    self.frontier.push(Cell::new(next, priority));
-                    self.parents.insert(next, curr);
+                    self.frontier
+                        .push(next, new_cost + map.distance(goal, next) as i32);
+                    self.came_from.insert(next, curr);
                 }
             }
         }
+        self.build_path(start, goal)
+    }
 
+    /// Find a path to a goal using [Dijkstra's Algorithm]. Note that if
+    /// the movement cost is uniform across your entire map then you are better
+    /// off using [Pathfinder::bfs] instead as it will be faster and give
+    /// the same results.
+    ///
+    /// If a `start` is specified, the algorithm will stop once it reaches the
+    /// `goal`. Otherwise it will run until all possible nodes have been visited.
+    /// Afterwards, a path can be retrieved via [Pathfinder::build_path].
+    ///
+    /// [Dijkstra's Algorithm]: https://www.redblobgames.com/pathfinding/a-star/introduction.html#dijkstra
+    pub fn dijkstra(
+        &mut self,
+        map: &impl PathMap,
+        start: Option<impl GridPoint>,
+        goal: impl GridPoint,
+    ) {
+        self.clear();
+
+        let start = start.map(|s| s.to_ivec2());
+        let goal = goal.to_ivec2();
+
+        let p = start.unwrap_or(goal);
+        self.frontier.push(p, 0);
+        self.costs.insert(p, 0);
+
+        while let Some(curr) = self.frontier.pop() {
+            if start.is_some() && curr == goal {
+                break;
+            }
+            for next in map.exits(curr) {
+                let new_cost = self.costs[&curr] + map.cost(curr, next) as i32;
+
+                let next_cost = self.costs.get(&next);
+                if next_cost.is_none() || new_cost < *next_cost.unwrap() {
+                    self.costs.insert(next, new_cost);
+                    self.frontier.push(next, new_cost);
+                    self.came_from.insert(next, curr);
+                }
+            }
+        }
+    }
+
+    /// Generate paths to a goal using a [Breadth First Search] algorithm.
+    ///
+    /// If a `start` is specified, the algorithm will stop once it reaches the
+    /// `goal`. Otherwise it will run until all possible nodes have been visited.
+    /// Afterwards, a path can be retrieved via [Pathfinder::build_path].
+    ///
+    /// [Breadth First Search]: https://www.redblobgames.com/pathfinding/a-star/introduction.html#breadth-first-search
+    pub fn bfs(&mut self, map: &impl PathMap, start: Option<impl GridPoint>, goal: impl GridPoint) {
+        self.clear();
+
+        let start = start.map(|s| s.to_ivec2());
+        let goal = goal.to_ivec2();
+
+        let p = start.unwrap_or(goal);
+        self.frontier.push(p, 0);
+
+        while let Some(curr) = self.frontier.pop() {
+            if start.is_some() && curr == goal {
+                break;
+            }
+            for next in map.exits(curr) {
+                if let Entry::Vacant(_) = self.came_from.entry(next) {
+                    self.frontier.push(next, self.frontier.len() as i32);
+                    self.came_from.insert(next, curr);
+                }
+            }
+        }
+    }
+
+    /// Attempt to construct a path from start to goal from the previously
+    /// populated path data. This function will only work once one of the
+    /// pathfinding functions have been used: [Pathfinder::astar], [Pathfinder::dijkstra],
+    /// or [Pathfinder::bfs].
+    ///
+    /// This function is called automatically by [Pathfinder::astar], and the
+    /// resulting path can be retrieved directly from that function or via
+    /// [Pathfinder::path].
+    ///
+    /// Returns the constructed path as a slice, or [None] if no pathfinding
+    /// functions have been run or if no valid path exists between the given
+    /// points.
+    pub fn build_path(&mut self, start: impl GridPoint, goal: impl GridPoint) -> Option<&[IVec2]> {
+        let mut curr = goal.to_ivec2();
+        let start = start.to_ivec2();
         self.path.clear();
-        if !self.parents.contains_key(&end) {
-            return None;
-        }
-
-        let mut curr = end;
-
-        while !curr.eq(&start) {
-            self.path.push(curr);
-            curr = self.parents[&curr];
-        }
-
-        self.path.push(start);
-
-        self.path.reverse();
-
-        Some(self.path.as_slice())
-    }
-
-    /// Generate a dijsktra map from the given point.
-    pub fn dijkstra(&mut self, map: &impl PathMap, origin: impl GridPoint) {
-        let start = origin.as_ivec2();
-        self.frontier.push(Cell::new(start, 0));
-        self.costs.insert(start, 0);
-
-        while !self.frontier.is_empty() {
-            let curr = self.frontier.pop().unwrap().value;
-
-            for next in map.exits(curr) {
-                let new_cost = self.costs[&curr] + map.cost(curr, next);
-
-                let next_cost = self.costs.get(&next);
-                if next_cost.is_none() || new_cost < *next_cost.unwrap() {
-                    self.costs.insert(next, new_cost);
-                    self.frontier.push(Cell::new(next, new_cost));
-                    self.parents.insert(next, curr);
-                }
+        while let Some(next) = self.came_from.get(&curr) {
+            self.path.push(*next);
+            if *next == start {
+                self.path.reverse();
+                return Some(self.path.as_slice());
             }
+            curr = *next;
         }
+        None
     }
 
-    /// Perform a breadth-first search from the given point. The map of visited
-    /// points is populated in `parents()`.
-    pub fn bfs(&mut self, map: &impl PathMap, origin: impl GridPoint) {
-        let start = origin.as_ivec2();
-        self.path.push(start);
-
-        while !self.path.is_empty() {
-            let curr = self.path.pop().unwrap();
-            for next in map.exits(curr) {
-                if let Entry::Vacant(_) = self.parents.entry(next) {
-                    self.path.push(next);
-                    self.parents.insert(next, curr);
-                }
-            }
-        }
-    }
-
-    /// Clear internal data.
+    /// Clear all internal data.
     pub fn clear(&mut self) {
-        self.path.clear();
         self.frontier.clear();
-        self.parents.clear();
+        self.came_from.clear();
         self.costs.clear();
+        self.path.clear();
     }
 
     /// An iterator over all nodes visited during pathfinding.
     pub fn visited(&self) -> impl Iterator<Item = &IVec2> {
-        self.parents.keys()
+        self.came_from.keys()
     }
 
-    /// Retrieve a reference to the `parents` map which is populated during 
+    /// Retrieve a reference to the `came_from` map which is populated during
     /// pathfinding operations.
-    pub fn parents(&self) -> &HashMap<IVec2, IVec2, RandomState> {
-        &self.parents
+    pub fn came_from(&self) -> &HashMap<IVec2, IVec2> {
+        &self.came_from
     }
 
-    /// Retrieve a reference to the `costs` map which is populated during 
+    /// Retrieve a reference to the `costs` map which is populated during
     /// pathfinding operations.
-    pub fn costs(&self) -> &HashMap<IVec2, i32, RandomState> {
+    pub fn costs(&self) -> &HashMap<IVec2, i32> {
         &self.costs
     }
 
-    /// Retrieve the `path` which is populated during pathfinding operations.
+    /// Retrieve a slice of the most recently built path data. If no path
+    /// has been built, the slice will be empty.
     pub fn path(&self) -> &[IVec2] {
-        self.path.as_slice()
-    }
-}
-
-impl From<Pathfinder> for Vec<IVec2> {
-    fn from(pf: Pathfinder) -> Self {
-        pf.path
-    }
-}
-
-#[derive(Eq)]
-struct Cell<T: Eq + Hash + Copy> {
-    cost: i32,
-    value: T,
-}
-
-impl<T: Eq + Hash + Copy> Cell<T> {
-    pub fn new(value: T, cost: i32) -> Self {
-        Self { value, cost }
-    }
-}
-
-impl<T: Eq + Hash + Copy> PartialOrd for Cell<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: Eq + Hash + Copy> Ord for Cell<T> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.cost.cmp(&self.cost)
-    }
-}
-
-impl<T: Eq + Hash + Copy> PartialEq for Cell<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.cost == other.cost && self.value == other.value
+        &self.path
     }
 }
 

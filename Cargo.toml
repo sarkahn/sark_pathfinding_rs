@@ -1,6 +1,6 @@
 [package]
 name = "sark_pathfinding"
-version = "0.3.0"
+version = "0.5.0"
 edition = "2021"
 homepage = "https://github.com/sarkahn/sark_pathfinding_rs"
 repository = "https://github.com/sarkahn/sark_pathfinding_rs"
@@ -10,19 +10,18 @@ description = "A simple implementation of the astar pathfinding algorthim from r
 keywords = ["bevy", "pathfinding", "2d", "astar"]
 
 [dependencies]
-glam = { version = "0.22" }
-smallvec = "1.7.0"
-ahash = "0.7.6"
+glam = { version = "0.29" }
+ahash = "0.8.7"
 arrayvec = "0.7.2"
-sark_grids = {path="../sark_grids_rs", version = "0.5.5"}
+sark_grids = { path = "../sark_grids_rs" }
+ordered-float = "4.6.0"
 
+[dev-dependencies.bevy]
+version = "0.15"
+default-features = false
+features = ["png", "bevy_winit", "bevy_render"]
 
 [dev-dependencies]
-bevy = {path="../bevy", version = "0.9", default-features = false, features = ["png", "bevy_winit", "render"]}
-bevy_ascii_terminal = {path="../bevy_ascii_terminal", version="0.12" }
+bevy_ascii_terminal = { path = "../bevy_ascii_terminal" }
 noise = "0.7.0"
-
-[features]
-dev = [
-    "bevy/dynamic",
-]
+rand = "0.8.5"
