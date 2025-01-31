@@ -24,32 +24,6 @@ pub const PLAYER_TILE: Tile = Tile::new('@', ALICE_BLUE, LinearRgba::BLACK);
 pub const GOLD_TILE: Tile = Tile::new('$', YELLOW, LinearRgba::BLACK);
 pub const GOBLIN_TILE: Tile = Tile::new('g', LinearRgba::RED, LinearRgba::BLACK);
 
-fn main() {
-    App::new()
-        .add_plugins((DefaultPlugins, TerminalPlugins))
-        .insert_resource(GoalMaps {
-            maps: [
-                DijkstraMap::new(SIZE),
-                DijkstraMap::new(SIZE),
-                DijkstraMap::new(SIZE),
-            ],
-        })
-        .insert_resource(ShowGoalMap::Chase)
-        .insert_resource(PathMap(PathMap2d::new(SIZE)))
-        .add_systems(Startup, setup)
-        .add_systems(
-            Update,
-            (
-                input,
-                update_dijkstra.run_if(player_moved),
-                move_goblins.run_if(player_moved),
-                draw.run_if(player_moved.or(resource_changed::<ShowGoalMap>)),
-            )
-                .chain(),
-        )
-        .run();
-}
-
 /// Maintain a separate map for each behavior
 #[derive(Resource)]
 pub struct GoalMaps {
@@ -91,6 +65,32 @@ pub struct Renderable(Tile);
 
 #[derive(Component, Deref, DerefMut)]
 pub struct Position(pub IVec2);
+
+fn main() {
+    App::new()
+        .add_plugins((DefaultPlugins, TerminalPlugins))
+        .insert_resource(GoalMaps {
+            maps: [
+                DijkstraMap::new(SIZE),
+                DijkstraMap::new(SIZE),
+                DijkstraMap::new(SIZE),
+            ],
+        })
+        .insert_resource(ShowGoalMap::Chase)
+        .insert_resource(PathMap(PathMap2d::new(SIZE)))
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (
+                input,
+                update_dijkstra.run_if(player_moved),
+                move_goblins.run_if(player_moved),
+                draw.run_if(player_moved.or(resource_changed::<ShowGoalMap>)),
+            )
+                .chain(),
+        )
+        .run();
+}
 
 fn setup(mut commands: Commands, mut map: ResMut<PathMap>) {
     commands.spawn(Terminal::new(SIZE));

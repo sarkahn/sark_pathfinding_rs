@@ -56,11 +56,11 @@ impl Pathfinder {
             }
 
             for next in map.exits(curr) {
-                let new_cost = self.costs[&curr] + map.cost(curr, next) as i32;
+                let new_cost = self.costs[&curr] + map.cost(curr, next);
                 if !self.costs.contains_key(&next) || new_cost < self.costs[&next] {
                     self.costs.insert(next, new_cost);
                     self.frontier
-                        .push(next, new_cost + map.distance(goal, next) as i32);
+                        .push(next, new_cost + map.distance(goal, next));
                     self.came_from.insert(next, curr);
                 }
             }
@@ -98,7 +98,7 @@ impl Pathfinder {
                 break;
             }
             for next in map.exits(curr) {
-                let new_cost = self.costs[&curr] + map.cost(curr, next) as i32;
+                let new_cost = self.costs[&curr] + map.cost(curr, next);
 
                 let next_cost = self.costs.get(&next);
                 if next_cost.is_none() || new_cost < *next_cost.unwrap() {

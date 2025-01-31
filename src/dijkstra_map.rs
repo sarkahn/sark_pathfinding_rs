@@ -98,7 +98,7 @@ impl DijkstraMap {
     pub fn clear_values(&mut self) {
         for (p, v) in self.values.iter_grid_points().zip(self.values.values_mut()) {
             if !self.goals.contains(&p) {
-                *v = 0.0;
+                *v = f32::MAX;
             }
         }
     }
@@ -107,7 +107,7 @@ impl DijkstraMap {
     pub fn clear_all(&mut self) {
         self.obstacles.set_all(true);
         self.goals.clear();
-        self.values.clear();
+        self.values.set_all(f32::MAX);
     }
 
     /// Apply a mathematical operation to every value in the grid.
@@ -158,6 +158,14 @@ impl DijkstraMap {
 
     pub fn values(&self) -> &[f32] {
         self.values.values()
+    }
+
+    /// Iterate over all the values in the map, skipping any obstacles.
+    pub fn iter_xy(&self) -> impl Iterator<Item = (IVec2, f32)> + '_ {
+        self.values
+            .iter_grid_points()
+            .filter(|p| !self.obstacles.get(*p))
+            .zip(self.values.values().iter().copied())
     }
 }
 
