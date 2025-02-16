@@ -7,52 +7,29 @@ use noise::{
 use rand::seq::SliceRandom;
 use sark_pathfinding::*;
 
-// Most named colors cannot be used in a const context since recent color changes
-// in bevy.
-// Guess we have to do it ourselves.
-const fn u8_color(r: u8, g: u8, b: u8) -> LinearRgba {
-    LinearRgba::rgb(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0)
-}
-const ALICE_BLUE: LinearRgba = u8_color(240, 248, 255);
-const DARK_GRAY: LinearRgba = u8_color(169, 169, 169);
-const YELLOW: LinearRgba = u8_color(255, 255, 0);
-
 pub const SIZE: UVec2 = UVec2::from_array([50, 40]);
-pub const WALL_TILE: Tile = Tile::new('#', LinearRgba::WHITE, LinearRgba::BLACK);
-pub const FLOOR_TILE: Tile = Tile::new('.', DARK_GRAY, LinearRgba::BLACK);
-pub const PLAYER_TILE: Tile = Tile::new('@', ALICE_BLUE, LinearRgba::BLACK);
-pub const GOLD_TILE: Tile = Tile::new('$', YELLOW, LinearRgba::BLACK);
-pub const GOBLIN_TILE: Tile = Tile::new('g', LinearRgba::RED, LinearRgba::BLACK);
-
-/// Maintain a separate map for each behavior
-#[derive(Resource)]
-pub struct GoalMaps {
-    maps: [DijkstraMap; 3],
-}
+pub const WALL_TILE: Tile = Tile::new('#', color::WHITE, color::BLACK);
+pub const FLOOR_TILE: Tile = Tile::new('.', color::DARK_GRAY, color::BLACK);
+pub const PLAYER_TILE: Tile = Tile::new('@', color::BLANCHED_ALMOND, color::BLACK);
+pub const GOLD_TILE: Tile = Tile::new('$', color::YELLOW, color::BLACK);
+pub const GOBLIN_TILE: Tile = Tile::new('g', color::DARK_GREEN, color::BLACK);
+pub const OGRE_TILE: Tile = Tile::new('O', color::DARK_RED, color::BLACK);
 
 #[derive(Resource, Clone, Copy, PartialEq, Eq)]
-pub enum ShowGoalMap {
+pub enum ShowGoals {
     None,
-    Chase,
-    Flee,
-    GoldOrChase,
+    Goblin,
+    Ogre,
 }
 
 #[derive(Resource, Deref, DerefMut)]
 pub struct PathMap(PathMap2d);
 
-#[derive(Component, Clone, Copy)]
-pub enum Behavior {
-    /// Chase the player
-    Chase,
-    /// Run from the player
-    Flee,
-    /// Chase the player, unless there's gold nearby
-    GoldOrChase,
-}
-
 #[derive(Component)]
 pub struct Goblin;
+
+#[derive(Component)]
+pub struct Ogre;
 
 #[derive(Component)]
 pub struct Player;
@@ -66,26 +43,38 @@ pub struct Renderable(Tile);
 #[derive(Component, Deref, DerefMut)]
 pub struct Position(pub IVec2);
 
+#[derive(Component, Deref, DerefMut)]
+pub struct GoalMap(DijkstraMap);
+
+#[derive(Resource)]
+struct GoblinGoals {
+    greed: DijkstraMap,
+    cowardice: DijkstraMap,
+    goal: DijkstraMap,
+}
+
+#[derive(Resource, Deref, DerefMut)]
+struct OgreGoals(DijkstraMap);
+
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins, TerminalPlugins))
-        .insert_resource(GoalMaps {
-            maps: [
-                DijkstraMap::new(SIZE),
-                DijkstraMap::new(SIZE),
-                DijkstraMap::new(SIZE),
-            ],
-        })
-        .insert_resource(ShowGoalMap::Chase)
         .insert_resource(PathMap(PathMap2d::new(SIZE)))
+        .insert_resource(ShowGoals::None)
+        .insert_resource(GoblinGoals {
+            greed: DijkstraMap::new(SIZE),
+            cowardice: DijkstraMap::new(SIZE),
+            goal: DijkstraMap::new(SIZE),
+        })
+        .insert_resource(OgreGoals(DijkstraMap::new(SIZE)))
         .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
                 input,
-                update_dijkstra.run_if(player_moved),
-                move_goblins.run_if(player_moved),
-                draw.run_if(player_moved.or(resource_changed::<ShowGoalMap>)),
+                update_goals.run_if(player_moved),
+                move_monsters.run_if(player_moved),
+                draw.run_if(player_moved.or(resource_changed::<ShowGoals>)),
             )
                 .chain(),
         )
@@ -96,6 +85,7 @@ fn setup(mut commands: Commands, mut map: ResMut<PathMap>) {
     commands.spawn(Terminal::new(SIZE));
     commands.spawn(TerminalCamera::new());
     build_walls(&mut map.0);
+
     let open_points: Vec<_> = map
         .iter_grid_points()
         .filter(|p| !map.is_obstacle(*p))
@@ -104,17 +94,23 @@ fn setup(mut commands: Commands, mut map: ResMut<PathMap>) {
     let mut random_point = || *open_points.choose(&mut rng).unwrap();
     commands.spawn((Player, Renderable(PLAYER_TILE), Position(random_point())));
 
-    // Give each goblin a unique behavior.
-    let behaviors = [Behavior::Chase, Behavior::Flee, Behavior::GoldOrChase];
-    (0..3).for_each(|i| {
+    for _ in 0..5 {
         commands.spawn((
             Goblin,
             Renderable(GOBLIN_TILE),
-            //Behavior::Flee,
-            behaviors[i],
             Position(random_point()),
+            GoalMap(DijkstraMap::new(SIZE)),
         ));
-    });
+    }
+
+    for _ in 0..2 {
+        commands.spawn((
+            Ogre,
+            Renderable(OGRE_TILE),
+            Position(random_point()),
+            GoalMap(DijkstraMap::new(SIZE)),
+        ));
+    }
 
     for _ in 0..3 {
         commands.spawn((Gold, Renderable(GOLD_TILE), Position(random_point())));
@@ -124,8 +120,8 @@ fn setup(mut commands: Commands, mut map: ResMut<PathMap>) {
 fn input(
     key: Res<ButtonInput<KeyCode>>,
     mut q_player: Query<&mut Position, With<Player>>,
-    mut show: ResMut<ShowGoalMap>,
-    pathmap: Res<PathMap>,
+    mut show: ResMut<ShowGoals>,
+    mut pathmap: ResMut<PathMap>,
 ) {
     let Ok(mut player) = q_player.get_single_mut() else {
         return;
@@ -133,10 +129,9 @@ fn input(
 
     if key.just_pressed(KeyCode::Tab) {
         *show = match *show {
-            ShowGoalMap::None => ShowGoalMap::Chase,
-            ShowGoalMap::Chase => ShowGoalMap::Flee,
-            ShowGoalMap::Flee => ShowGoalMap::GoldOrChase,
-            ShowGoalMap::GoldOrChase => ShowGoalMap::None,
+            ShowGoals::None => ShowGoals::Goblin,
+            ShowGoals::Goblin => ShowGoals::Ogre,
+            ShowGoals::Ogre => ShowGoals::None,
         };
     }
 
@@ -177,9 +172,10 @@ fn input(
         return;
     }
     let next = player.0 + movement;
-    if pathmap.is_obstacle(next) {
+    if !pathmap.in_bounds(next) || pathmap.is_obstacle(next) {
         return;
     }
+    pathmap.0.move_obstacle(player.0, next);
     player.0 = next;
 }
 
@@ -187,90 +183,196 @@ fn player_moved(q_player: Query<&Position, (With<Player>, Changed<Position>)>) -
     !q_player.is_empty()
 }
 
-fn update_dijkstra(
-    q_player: Query<&Position, With<Player>>,
-    q_gold: Query<&Position, With<Gold>>,
+#[allow(clippy::type_complexity)]
+fn update_goals(
+    q_ogres: Query<&Position, With<Ogre>>,
+    q_goblins: Query<&Position, (With<Goblin>, Without<Ogre>)>,
+    q_gold: Query<&Position, (With<Gold>, Without<Ogre>, Without<Goblin>)>,
+    q_player: Query<&Position, (With<Player>, Without<Goblin>, Without<Ogre>, Without<Gold>)>,
+    mut goblin_goals: ResMut<GoblinGoals>,
+    mut ogre_goals: ResMut<OgreGoals>,
     pathing: Res<PathMap>,
-    mut goals: ResMut<GoalMaps>,
 ) {
-    let chase = &mut goals.maps[0];
-    chase.clear_all();
-    let player_xy = q_player.single().0;
-    chase.add_goal(player_xy, 1.0);
-    chase.recalculate(&pathing.0);
+    let player_pos = q_player.single().0;
 
-    // let flee = &mut goals.maps[1];
-    // flee.clear_all();
-    // flee.add_goal(player_xy, 1.0);
-    // flee.recalculate(&pathing.0);
-    // flee.apply_operation(|v| v * -2.5);
-    // flee.recalculate(&pathing.0);
+    ogre_goals.clear_all();
+    for gob_pos in &q_goblins {
+        ogre_goals.add_goal(gob_pos.0, 5.0);
+    }
+    ogre_goals.add_goal(player_pos, 1.0);
+    ogre_goals.recalculate(&pathing.0);
 
-    // let greed = &mut goals.maps[2];
-    // greed.clear_all();
-    // greed.add_goal(player_xy, 1.0);
-    // for p in q_gold.iter().map(|p| p.0) {
-    //     greed.add_goal(p, 4.0);
+    goblin_goals.greed.clear_all();
+    goblin_goals.cowardice.clear_all();
+
+    for gold_pos in &q_gold {
+        goblin_goals.greed.add_goal(gold_pos.0, 5.0);
+    }
+    goblin_goals.greed.recalculate(&pathing.0);
+
+    // Goblins really hate ogres
+    for ogre_pos in &q_ogres {
+        goblin_goals.cowardice.add_goal(ogre_pos.0, -2.0);
+    }
+    // And kinda hate players
+    goblin_goals.cowardice.add_goal(player_pos, -1.0);
+
+    //println!("GOALS preflip {:?}", goblin_goals.cowardice.values());
+    goblin_goals.cowardice.recalculate(&pathing.0);
+    goblin_goals.cowardice.apply_operation(|f| f * -1.2);
+
+    // for gold_pos in &q_gold {
+    //     goblin_goals.cowardice.set_goal(gold_pos.0, -15.0);
     // }
-    // greed.recalculate(&pathing.0);
+
+    goblin_goals.cowardice.recalculate(&pathing.0);
+
+    // println!("GOALS postflip {:?}", goblin_goals.cowardice.values());
 }
 
-fn move_goblins(
-    mut q_goblin: Query<(&mut Position, &Behavior), With<Goblin>>,
-    goals: Res<GoalMaps>,
+fn move_monsters(
+    mut q_goblins: Query<&mut Position, With<Goblin>>,
+    mut q_ogres: Query<&mut Position, (With<Ogre>, Without<Goblin>)>,
+    mut pathing: ResMut<PathMap>,
+    goblin_goals: Res<GoblinGoals>,
+    ogres_goals: Res<OgreGoals>,
 ) {
-    for (mut p, behavior) in &mut q_goblin {
-        let map = match behavior {
-            Behavior::Chase => &goals.maps[0],
-            Behavior::Flee => &goals.maps[1],
-            Behavior::GoldOrChase => &goals.maps[2],
-        };
-        let Some(next) = map.exits(p.0).next() else {
-            continue;
-        };
-        p.0 = next;
+    for mut p in &mut q_goblins {
+        if let Some(next) = goblin_goals.cowardice.next_lowest(p.0, &pathing.0) {
+            pathing.move_obstacle(p.0, next);
+            *p = Position(next);
+        }
+        // let mut exits = goblin_goals.cowardice.exits(p.0, &pathing.0);
+        // if let Some(next) = exits.next() {
+        //     pathing.move_obstacle(p.0, next);
+        //     *p = Position(next);
+        // }
     }
+
+    // for mut p in &mut q_ogres {
+    //     let mut exits = ogres_goals.exits(p.0);
+    //     if let Some(next) = exits.next() {
+    //         pathing.move_obstacle(p.0, next);
+    //         *p = Position(next);
+    //     }
+    // }
 }
 
 fn draw(
     mut q_term: Query<&mut Terminal>,
-    show: Res<ShowGoalMap>,
-    goals: Res<GoalMaps>,
+    show: Res<ShowGoals>,
     pathing: Res<PathMap>,
     q_renderables: Query<(&Renderable, &Position)>,
+    goblin_goals: Res<GoblinGoals>,
+    ogre_goals: Res<OgreGoals>,
 ) {
     let mut term = q_term.single_mut();
+    term.clear();
     let count = term.tile_count();
     let tiles = term.tiles_mut();
 
     (0..count).for_each(|i| {
-        if pathing.obstacle_grid().get_index(i) {
+        if pathing.obstacle_grid().value_from_index(i) {
             tiles[i] = WALL_TILE;
         } else {
             tiles[i] = FLOOR_TILE;
         }
     });
 
-    if let Some(goals) = match *show {
-        ShowGoalMap::None => None,
-        ShowGoalMap::Chase => Some(&goals.maps[0]),
-        ShowGoalMap::Flee => Some(&goals.maps[1]),
-        ShowGoalMap::GoldOrChase => Some(&goals.maps[2]),
-    } {
-        for ((p, tile), v) in term.iter_xy_mut().zip(goals.values().iter()) {
-            if pathing.is_obstacle(p) {
-                continue;
-            }
-            if (-9.9..=9.9).contains(v) {
-                let ch = char::from_digit((*v as i32).unsigned_abs(), 10).unwrap();
-                let t = (v + 10.0) / 20.0;
-                let bg = LinearRgba::lerp(LinearRgba::GREEN, LinearRgba::RED, t).with_alpha(0.5);
-                tile.glyph = ch;
-                tile.bg_color = bg;
-                tile.fg_color = LinearRgba::BLACK;
+    if *show != ShowGoals::None {
+        let (map, string) = match *show {
+            ShowGoals::Goblin => (&goblin_goals.cowardice, "Showing Goblin goals"),
+            ShowGoals::Ogre => (&ogre_goals.0, "Showing Ogre goals"),
+            _ => unreachable!(),
+        };
+        for (p, v) in map.iter_xy() {
+            let tile_value = v as i32;
+            let digit_value = tile_value.abs() % 62; // 0-61 for 0-9, a-z, A-Z
+            let t = tile_value.abs() as f32 / 30.0;
+
+            let distance_char = match digit_value {
+                0..=9 => (b'0' + digit_value as u8) as char, // 0-9
+                10..=35 => (b'a' + (digit_value - 10) as u8) as char, // Far
+                36..=61 => (b'A' + (digit_value - 36) as u8) as char, // Pretty far
+                _ => '-',                                    // Very far
             };
+
+            let (bg, fg) = if tile_value >= 0 {
+                (
+                    Srgba::lerp(css::LIGHT_BLUE, css::DARK_BLUE, t),
+                    LinearRgba::BLACK,
+                )
+            } else {
+                (
+                    Srgba::lerp(css::LIGHT_BLUE, css::DARK_RED, t),
+                    LinearRgba::WHITE,
+                )
+            };
+
+            let tile = Tile::new(distance_char, fg, bg.into());
+            term.put_tile(p, tile);
         }
+        // for (p, v) in map.iter_xy() {
+        //     let tile_value = v.rem_euclid(16.0);
+        //     let t = tile_value / 16.0;
+
+        //     // Select tile character based on integer part
+        //     let digit = (tile_value as i32).unsigned_abs();
+        //     if let Some(digit_char) = char::from_digit(digit, 16) {
+        //         // Cycle colors based on tile value
+        //         let bg = match digit {
+        //             0..=7 => Srgba::lerp(css::YELLOW, css::PURPLE, t),
+        //             _ => Srgba::lerp(css::PURPLE, css::ORANGE, t),
+        //         };
+
+        //         let fg = LinearRgba::BLACK;
+        //         let tile = Tile::new(digit_char, fg, bg.into());
+        //         term.put_tile(p, tile);
+        //     }
+        // }
+        // for (p, v) in map.iter_xy() {
+        //     if (-15.9..=15.9).contains(&v) {
+        //         let t = (v + 16.0) / 32.0;
+        //         let digit = v as i32;
+        //         let digit = char::from_digit(digit.unsigned_abs(), 16).unwrap();
+        //         let bg = Srgba::lerp(css::YELLOW, css::PURPLE, t);
+        //         let fg = LinearRgba::BLACK;
+        //         let tile = Tile::new(digit, fg, bg.into());
+        //         term.put_tile(p, tile);
+        //     } else {
+        //         let digit = v as i32 - 16;
+        //         let t = (v + 16.0) / 32.0;
+        //         if let Some(digit) = char::from_digit(digit.unsigned_abs(), 16) {
+        //             let bg = Srgba::lerp(css::PURPLE, css::ORANGE, t);
+        //             let fg = LinearRgba::BLACK;
+        //             let tile = Tile::new(digit, fg, bg.into());
+        //             term.put_tile(p, tile);
+        //         }
+        //     }
+        // }
+        term.put_string([0, 0], string.clear_colors());
     }
+
+    // if let Some(goals) = match *show {
+    //     ShowGoalMap::None => None,
+    //     ShowGoalMap::Chase => Some(&goals.maps[0]),
+    //     ShowGoalMap::Flee => Some(&goals.maps[1]),
+    //     ShowGoalMap::GoldOrChase => Some(&goals.maps[2]),
+    // } {
+    //     for ((p, tile), v) in term.iter_xy_mut().zip(goals.values().iter()) {
+    //         if pathing.is_obstacle(p) {
+    //             continue;
+    //         }
+    //         if (-9.9..=9.9).contains(v) {
+    //             let ch = char::from_digit((*v as i32).unsigned_abs(), 10).unwrap();
+    //             let t = (v + 10.0) / 20.0;
+    //             let bg = LinearRgba::lerp(LinearRgba::GREEN, LinearRgba::RED, t).with_alpha(0.5);
+    //             tile.glyph = ch;
+    //             tile.bg_color = bg;
+    //             tile.fg_color = LinearRgba::BLACK;
+    //         };
+    //     }
+    // }
 
     // for (i, (tile, v)) in term
     //     .tiles_mut()

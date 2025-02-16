@@ -8,11 +8,11 @@ use rand::seq::{IteratorRandom, SliceRandom};
 use sark_pathfinding::*;
 
 pub const SIZE: UVec2 = UVec2::from_array([50, 40]);
-pub const WALL_TILE: Tile = Tile::new('#', colors::WHITE, colors::BLACK);
-pub const FLOOR_TILE: Tile = Tile::new('.', colors::DARK_GRAY, colors::BLACK);
-pub const PLAYER_TILE: Tile = Tile::new('@', colors::ALICE_BLUE, colors::BLACK);
-pub const GOLD_TILE: Tile = Tile::new('$', colors::YELLOW, colors::BLACK);
-pub const GOBLIN_TILE: Tile = Tile::new('g', colors::RED, colors::BLACK);
+pub const WALL_TILE: Tile = Tile::new('#', color::WHITE, color::BLACK);
+pub const FLOOR_TILE: Tile = Tile::new('.', color::DARK_GRAY, color::BLACK);
+pub const PLAYER_TILE: Tile = Tile::new('@', color::ALICE_BLUE, color::BLACK);
+pub const GOLD_TILE: Tile = Tile::new('$', color::YELLOW, color::BLACK);
+pub const GOBLIN_TILE: Tile = Tile::new('g', color::RED, color::BLACK);
 
 /// Maintain a separate map for each behavior
 #[derive(Component)]
@@ -25,6 +25,12 @@ pub struct PathMap(PathMap2d);
 pub struct DrawMap(bool);
 
 #[derive(Component)]
+pub struct Renderable(Tile);
+
+#[derive(Component, Deref, DerefMut)]
+pub struct Position(pub IVec2);
+
+#[derive(Component)]
 pub struct Goblin;
 
 #[derive(Component)]
@@ -35,12 +41,6 @@ pub struct ApproachMap(DijkstraMap);
 
 #[derive(Component)]
 pub struct Gold;
-
-#[derive(Component)]
-pub struct Renderable(Tile);
-
-#[derive(Component, Deref, DerefMut)]
-pub struct Position(pub IVec2);
 
 fn main() {
     App::new()
@@ -183,7 +183,7 @@ fn render(
     let tiles = term.tiles_mut();
 
     (0..count).for_each(|i| {
-        if pathing.obstacle_grid().get_index(i) {
+        if pathing.obstacle_grid().value_from_index(i) {
             tiles[i] = WALL_TILE;
         } else {
             tiles[i] = FLOOR_TILE;
@@ -201,10 +201,10 @@ fn render(
                     let v = (v / 255.0) as u8;
                     LinearRgba::from_u8_array([v, v, v, 255])
                 } else {
-                    colors::MAGENTA
+                    color::MAGENTA
                 };
                 if let Some(ch) = char::from_digit((v as i32).unsigned_abs(), 10) {
-                    term.put_tile(p, Tile::new(ch, colors::WHITE, colors::BLACK));
+                    term.put_tile(p, Tile::new(ch, color::WHITE, color::BLACK));
                 }
             }
         }

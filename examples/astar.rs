@@ -110,7 +110,7 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, pstate: Res<Pathing
     let mut term = q_term.single_mut();
 
     for (i, tile) in (0..map.tile_count()).zip(term.tiles_mut()) {
-        match map.obstacle_grid().get_index(i) {
+        match map.obstacle_grid().value_from_index(i) {
             true => *tile = WALL_TILE,
             false => *tile = FLOOR_TILE,
         };
