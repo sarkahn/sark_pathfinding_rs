@@ -1,7 +1,7 @@
 //! A simple implementation of a "Dijkstra Map" as described in https://www.roguebasin.com/index.php/Dijkstra_Maps_Visualized
 
 use crate::{min_heap::MinHeap, PathMap};
-use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use ahash::{HashSet, HashSetExt};
 use arrayvec::{ArrayVec, IntoIter};
 use glam::{IVec2, UVec2};
 use sark_grids::{BitGrid, FloatGrid, GridPoint, GridSize, SizedGrid};
@@ -9,23 +9,49 @@ use sark_grids::{BitGrid, FloatGrid, GridPoint, GridSize, SizedGrid};
 const INITIAL_VALUE: f32 = 1000.0;
 const EXIT_CAP: usize = 8;
 
-/// A simple implementation of a "Dijkstra Map" as described in https://www.roguebasin.com/index.php/Dijkstra_Maps_Visualized
+/// A simple implementation of a "Dijkstra Map" as described in [Dijsktra Maps Visualized]
+///
+/// A [PathMap] is used to define the obstacles and movement costs for the map.
 ///
 /// Various 'goals' can be defined with specific values. Once the map is
-/// recalculated, a path can be followed from any valid position to find the
-/// most 'desired' goal from that position.
+/// recalculated using a [PathMap] a path to the nearest goal can be
+/// followed by querying for the next lowest value exit from any given position.
+///
+/// # Example
+///
+/// ```
+/// use sark_pathfinding::*;
+/// let mut pathmap = PathMap2d::new([20,20]);
+/// pathmap.add_obstacle([5,5]);
+/// pathmap.add_obstacle([5,6]);
+/// pathmap.add_obstacle([5,7]);
+///
+/// // Ensure the dijsktra map is defined with  the same size as your pathmap.
+/// let mut goals = DijkstraMap::new([20,20]);
+/// goals.add_goal([10,10], 0.0);
+/// goals.add_goal([15,15], 5.0);
+/// goals.recalculate(&pathmap);
+/// let next_step = goals.next_lowest([13,13], &pathmap).unwrap();
+/// // Lower value goals are considered 'closer'.
+/// assert_eq!([12,12], next_step.to_array());
+/// ```
+/// [Dijsktra Maps Visualized]: https://www.roguebasin.com/index.php/Dijkstra_Maps_Visualized
 #[derive(Debug, Default, Clone)]
 pub struct DijkstraMap {
     values: FloatGrid,
     goals: HashSet<IVec2>,
+    /// Obstacles populated during map recalculation. This is only used
+    /// when iterating over map values on an already calculated map to skip
+    /// 'obstacles'.
     obstacles: BitGrid,
-    frontier: MinHeap<f32>,
+    frontier: MinHeap,
     size: UVec2,
+    initial_value: f32,
 }
 
 impl DijkstraMap {
     pub fn new(size: impl GridSize) -> Self {
-        let mut values = FloatGrid::new([0, 0], size.to_uvec2());
+        let mut values = FloatGrid::new(size.to_uvec2());
         values.set_all(INITIAL_VALUE);
         Self {
             values,
@@ -33,7 +59,14 @@ impl DijkstraMap {
             frontier: MinHeap::with_capacity(size.tile_count()),
             obstacles: BitGrid::new(size.to_uvec2()),
             size: size.to_uvec2(),
+            initial_value: INITIAL_VALUE,
         }
+    }
+
+    pub fn with_initial_value(mut self, initial_value: f32) -> Self {
+        self.initial_value = initial_value;
+        self.values.set_all(initial_value);
+        self
     }
 
     pub fn from_string(s: impl AsRef<str>) -> Option<Self> {
@@ -43,13 +76,18 @@ impl DijkstraMap {
             return None;
         }
         let size = UVec2::new(width as u32, height as u32);
-        let mut values = FloatGrid::new([0, 0], size);
+        let mut values = FloatGrid::new(size);
         values.set_all(INITIAL_VALUE);
         let mut goals = HashSet::new();
         let mut obstacles = BitGrid::new(size);
-        let (mut x, mut y) = (0, 0);
-        for line in s.as_ref().lines().filter(|l| !l.is_empty()).rev() {
-            for c in line.chars() {
+        for (y, line) in s
+            .as_ref()
+            .lines()
+            .filter(|l| !l.is_empty())
+            .rev()
+            .enumerate()
+        {
+            for (x, c) in line.chars().enumerate() {
                 match c {
                     '#' => {
                         obstacles.set([x, y], true);
@@ -58,14 +96,11 @@ impl DijkstraMap {
                         // Attempt to convert the char into a goal value
                         if let Some(v) = c.to_digit(10).map(|d| d as f32) {
                             values.set_value([x, y], v);
-                            goals.insert(IVec2::from([x, y]));
+                            goals.insert(IVec2::from([x as i32, y as i32]));
                         }
                     }
                 }
-                x += 1;
             }
-            y += 1;
-            x = 0;
         }
 
         Some(Self {
@@ -73,15 +108,14 @@ impl DijkstraMap {
             goals,
             obstacles,
             frontier: MinHeap::with_capacity(size.tile_count()),
-            //came_from: HashMap::with_capacity(size.tile_count()),
             size,
+            initial_value: INITIAL_VALUE,
         })
     }
 
     /// Add a 'goal' to a map position. `value` determines the desirability of
-    /// the goal during pathfinding, where higher values goals are more desireable,
-    /// higher value value goals could be preferred over lower value goals at
-    /// the same or closer distances.
+    /// the goal during pathfinding, where lower value goals are seen as 'closer' than
+    /// higher value goals.
     ///
     /// If you add to an existing goal, the value will be added to the previously
     /// set value.
@@ -96,6 +130,9 @@ impl DijkstraMap {
         }
     }
 
+    /// Set the goal value for a position.
+    ///
+    /// Lower value goals are considered 'closer' during pathfinding.
     pub fn set_goal(&mut self, xy: impl GridPoint, value: f32) {
         self.values[xy] = value;
         self.goals.insert(xy.to_ivec2());
@@ -104,9 +141,8 @@ impl DijkstraMap {
     /// Recalculate the map based on the given pathing.
     ///
     /// This will not clear any currently set map values and will overwrite previous
-    /// values based on the current state of set goals. To recalculate a clean
-    /// map based only on the currently set goals, call [DijkstraMap::clear_values]
-    /// to clear any previously set non-goal tiles.
+    /// values. To recalculate a clean map based only on the currently set goals,
+    /// call [DijkstraMap::clear_values] to clear any previously set non-goal tiles.
     pub fn recalculate(&mut self, pathing: &impl PathMap) {
         self.obstacles.set_all(true);
         self.frontier.clear();
@@ -116,7 +152,7 @@ impl DijkstraMap {
             if !self.goals.contains(&xy) && pathing.is_obstacle(xy) {
                 continue;
             }
-            self.frontier.push(xy, self.values[i]);
+            self.frontier.push(xy, self.values[i] as i32);
         }
 
         while let Some(curr) = self.frontier.pop() {
@@ -125,7 +161,7 @@ impl DijkstraMap {
                 self.obstacles.set(next, false);
                 if new_cost < self.values.value(next) {
                     self.values.set_value(next, new_cost);
-                    self.frontier.push(next, new_cost);
+                    self.frontier.push(next, new_cost as i32);
                 }
             }
         }
@@ -142,35 +178,11 @@ impl DijkstraMap {
         self.goals.iter().map(|p| (*p, self.values.value(*p)))
     }
 
-    // pub fn recalculate(&mut self, pathing: &impl PathMap) {
-    //     self.obstacles.set_all(true);
-    //     self.came_from.clear();
-    //     self.frontier.clear();
-
-    //     for goal in self.goals.iter() {
-    //         let v = self.values.value(*goal);
-    //         self.frontier.push(*goal, v);
-    //         self.came_from.insert(*goal, *goal);
-    //     }
-
-    //     while let Some(curr) = self.frontier.pop() {
-    //         for next in pathing.exits(curr) {
-    //             let new_cost = self.values.value(curr) + pathing.cost(curr, next) as f32;
-    //             self.obstacles.set(next, false);
-    //             if !self.came_from.contains_key(&next) || new_cost < self.values.value(next) {
-    //                 self.values.set_value(next, new_cost);
-    //                 self.frontier.push(next, new_cost);
-    //                 self.came_from.insert(next, curr);
-    //             }
-    //         }
-    //     }
-    // }
-
     /// Resets the value of all non-goal tiles.
     pub fn clear_values(&mut self) {
         for (p, v) in self.values.iter_grid_points().zip(self.values.values_mut()) {
             if !self.goals.contains(&p) {
-                *v = INITIAL_VALUE;
+                *v = self.initial_value;
             }
         }
     }
@@ -182,11 +194,9 @@ impl DijkstraMap {
         self.goals.clear();
     }
 
-    /// Apply a mathematical operation to every value in the grid.
+    /// Apply a mathematical operation to every value in the map.
     pub fn apply_operation(&mut self, operation: impl Fn(f32) -> f32) {
-        for v in self.iter_xy_mut() {
-            *v.1 = operation(*v.1);
-        }
+        self.values.apply_operation(operation);
     }
 
     /// A reference to the [DijkstraMap]'s underlying [FloatGrid].
@@ -201,6 +211,8 @@ impl DijkstraMap {
 
     /// Retrieve an iterator over the valid exits from a given position on the [DijkstraMap].
     ///
+    /// The [DijkstraMap] does not store pathing information so a [PathMap] must be provided.
+    ///
     /// The exits are sorted by 'value', so the first exit should be considered
     /// the most 'valuable'. The actual values can be retrieved via [DijkstraMap::exit_values].
     pub fn exits(&self, xy: impl GridPoint, pathing: &impl PathMap) -> impl Iterator<Item = IVec2> {
@@ -208,6 +220,8 @@ impl DijkstraMap {
     }
 
     /// Retrieve an iterator over the valid exits from a given position on the [DijkstraMap].
+    ///
+    /// The [DijkstraMap] does not store pathing information so a [PathMap] must be provided.
     ///
     /// Returns an iterator of 2 element tuples, where each tuple contains a position
     /// and it's corresponding 'value' in the [DijkstraMap]. The exits
@@ -232,6 +246,8 @@ impl DijkstraMap {
     }
 
     /// Returns the lowest value exit from a position if there is one.
+    ///
+    /// The [DijkstraMap] does not store pathing information so a [PathMap] must be provided.
     pub fn next_lowest(&self, xy: impl GridPoint, pathing: &impl PathMap) -> Option<IVec2> {
         let xy = xy.to_ivec2();
         let mut v: ArrayVec<(IVec2, i32), EXIT_CAP> = ArrayVec::new();
@@ -248,6 +264,8 @@ impl DijkstraMap {
     }
 
     /// Returns the highest value exit from a position if there is one.
+    ///
+    /// The [DijkstraMap] does not store pathing information so a [PathMap] must be provided.
     pub fn next_highest(&self, xy: impl GridPoint, pathing: &impl PathMap) -> Option<IVec2> {
         let xy = xy.to_ivec2();
         let mut v: ArrayVec<(IVec2, i32), EXIT_CAP> = ArrayVec::new();

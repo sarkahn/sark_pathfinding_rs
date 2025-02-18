@@ -2,7 +2,7 @@ use arrayvec::{ArrayVec, IntoIter};
 use glam::{IVec2, UVec2};
 use sark_grids::{bit_grid::BitGrid, GridPoint, GridSize, SizedGrid};
 
-pub const MAX_EXITS: usize = 8;
+pub const DEFAULT_MAX_EXITS: usize = 8;
 pub const DEFAULT_CARDINAL_COST: i32 = 2;
 pub const DEFAULT_DIAGONAL_COST: i32 = 3;
 
@@ -154,7 +154,7 @@ impl PathMap2d {
 }
 
 impl PathMap for PathMap2d {
-    type ExitIterator = IntoIter<IVec2, MAX_EXITS>;
+    type ExitIterator = IntoIter<IVec2, DEFAULT_MAX_EXITS>;
     fn exits(&self, p: impl GridPoint) -> Self::ExitIterator {
         let mut points = ArrayVec::new();
         let neighbours = match self.adjacency {

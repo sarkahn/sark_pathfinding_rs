@@ -1,3 +1,5 @@
+//! A utility for pathfinding that supports several simple agorithms.
+
 use ahash::{HashMap, HashMapExt};
 use glam::IVec2;
 use sark_grids::GridPoint;
@@ -8,6 +10,18 @@ use crate::{min_heap::MinHeap, pathmap::PathMap};
 /// Utility for pathfinding that supports several simple algorithms.
 ///
 /// Maintains internal state so it can be re-used to avoid allocations.
+///
+/// # Example
+///
+/// ```
+/// use sark_pathfinding::*;
+/// let mut pathmap = PathMap2d::new([10, 10]);
+/// pathmap.add_obstacle([3,0]);
+/// pathmap.add_obstacle([3,1]);
+/// let mut pathfinder = Pathfinder::new();
+/// let path = pathfinder.astar(&pathmap, [0, 0], [5, 0]).unwrap();
+/// assert_eq!(6, path.len());
+/// ```
 #[derive(Default)]
 pub struct Pathfinder {
     frontier: MinHeap,
@@ -38,6 +52,16 @@ impl Pathfinder {
     /// can be found.
     ///
     /// [A*]: https://www.redblobgames.com/pathfinding/a-star/introduction.html#astar
+    ///
+    /// # Example
+    /// ```
+    /// use sark_pathfinding::*;
+    /// let mut pf = Pathfinder::new();
+    /// let mut map = PathMap2d::new([10, 10]);
+    /// map.add_obstacle([3,0]);
+    /// map.add_obstacle([3,1]);
+    /// let path = pf.astar(&map, [0, 0], [5, 0]).unwrap();
+    /// assert_eq!(6, path.len());
     pub fn astar(
         &mut self,
         map: &impl PathMap,
@@ -76,6 +100,9 @@ impl Pathfinder {
     /// If a `start` is specified, the algorithm will stop once it reaches the
     /// `goal`. Otherwise it will run until all possible nodes have been visited.
     /// Afterwards, a path can be retrieved via [Pathfinder::build_path].
+    ///
+    /// Note this is seperate from [crate::DijkstraMap] which is used for calculating
+    /// the a path to the most valuable goal on a grid.
     ///
     /// [Dijkstra's Algorithm]: https://www.redblobgames.com/pathfinding/a-star/introduction.html#dijkstra
     pub fn dijkstra(
@@ -155,6 +182,7 @@ impl Pathfinder {
         let mut curr = goal.to_ivec2();
         let start = start.to_ivec2();
         self.path.clear();
+        self.path.push(curr);
         while let Some(next) = self.came_from.get(&curr) {
             self.path.push(*next);
             if *next == start {

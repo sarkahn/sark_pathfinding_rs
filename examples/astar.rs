@@ -131,7 +131,7 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, pstate: Res<Pathing
     if !path.is_empty() {
         for (i, p) in path.iter().enumerate() {
             let t = i as f32 / (path.len() - 2) as f32;
-            let col = color_lerp(START_COLOR, END_COLOR, t);
+            let col = LinearRgba::lerp(START_COLOR, END_COLOR, t);
             term.put_char(*p, '█').fg(col);
         }
         term.put_string(
@@ -169,18 +169,6 @@ fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, pstate: Res<Pathing
         [0, 3],
         "                                            ".fg(fg),
     );
-}
-
-fn color_lerp(a: LinearRgba, b: LinearRgba, t: f32) -> LinearRgba {
-    LinearRgba::lerp(a, b, t)
-    // let t = f32::clamp(t, 0.0, 1.0);
-    // a + (b - a) * t
-    // // LinearRgba::new(
-    // //     a.red + (b.red - a.red) * t,
-    // //     a.green + (b.green - a.green) * t,
-    // //     a.blue + (b.blue - a.blue) * t,
-    // //     a.alpha + (b.alpha - a.alpha) * t,
-    // // )
 }
 
 fn build_walls(walls: &mut PathMap2d) {

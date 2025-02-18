@@ -321,7 +321,9 @@ dependencies = [
 
 [[package]]
 name = "bevy_ascii_terminal"
-version = "0.16.0-dev"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e53ca48856f226088958ad6d970e68494c86a099821c28e0353121f15475b1a"
 dependencies = [
  "bevy",
  "byteorder",
@@ -2595,15 +2597,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordered-float"
-version = "4.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3055,6 +3048,8 @@ dependencies = [
 [[package]]
 name = "sark_grids"
 version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7996fb55a2cd7e7d4f069a8671da0785b3f068f66b5d66e174633e4ae9b5a5b"
 dependencies = [
  "bit-vec 0.6.3",
  "enum-ordinalize",
@@ -3072,7 +3067,6 @@ dependencies = [
  "bevy_ascii_terminal",
  "glam",
  "noise",
- "ordered-float",
  "rand 0.8.5",
  "sark_grids",
 ]
@@ -3907,9 +3901,9 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "winit"
-version = "0.30.8"
+version = "0.30.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5d74280aabb958072864bff6cfbcf9025cf8bfacdde5e32b5e12920ef703b0f"
+checksum = "a809eacf18c8eca8b6635091543f02a5a06ddf3dad846398795460e6e0ae3cc0"
 dependencies = [
  "android-activity",
  "atomic-waker",
