@@ -18,7 +18,7 @@ sark_grids = "0.6"
 [dev-dependencies.bevy]
 version = "0.15"
 default-features = false
-features = ["png", "bevy_winit", "bevy_render"]
+features = ["png", "bevy_winit", "bevy_render", "x11"]
 
 [dev-dependencies]
 noise = "0.7.0"
