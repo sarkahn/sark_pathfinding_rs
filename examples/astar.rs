@@ -54,19 +54,15 @@ fn setup(mut commands: Commands) {
 
 fn input(
     input: Res<ButtonInput<MouseButton>>,
-    q_cam: Query<&TerminalCamera>,
-    q_term: Query<&TerminalTransform>,
+    cam: Single<&TerminalCamera>,
+    term: Single<&TerminalTransform>,
     mut map: ResMut<PathMap>,
     mut path: ResMut<PathingState>,
 ) {
-    let Some(cursor) = q_cam.get_single().ok().and_then(|c| c.cursor_world_pos()) else {
+    let Some(cursor) = cam.cursor_world_pos() else {
         return;
     };
-    let Some(xy) = q_term
-        .get_single()
-        .ok()
-        .and_then(|t| t.world_to_tile(cursor))
-    else {
+    let Some(xy) = term.world_to_tile(cursor) else {
         return;
     };
 
@@ -96,21 +92,19 @@ fn update_path(map: Res<PathMap>, mut pstate: ResMut<PathingState>) {
     }
 
     if let (Some(start), Some(end)) = (pstate.start, pstate.end) {
-        let time = bevy::utils::Instant::now();
+        let time = bevy::platform::time::Instant::now();
         pstate.finder.astar(&map.0, start, end);
         pstate.time = time.elapsed().as_secs_f32();
     }
 }
 
-fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingState>) {
+fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingState>) {
     if !map.is_changed() && !pstate.is_changed() {
         return;
     }
 
-    let mut term = q_term.single_mut();
-
     for (i, tile) in (0..map.tile_count()).zip(term.tiles_mut()) {
-        match map.obstacle_grid().value_from_index(i) {
+        match map.obstacle_grid()[i] {
             true => *tile = WALL_TILE,
             false => *tile = FLOOR_TILE,
         };
