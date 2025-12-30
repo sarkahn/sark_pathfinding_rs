@@ -21,6 +21,6 @@ default-features = false
 features = ["png", "bevy_winit", "bevy_render", "x11"]
 
 [dev-dependencies]
-noise = "0.7.0"
+noise = "0.9.0"
 rand = "0.8.5"
 bevy_ascii_terminal = "0.18.1"

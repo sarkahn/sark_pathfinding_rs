@@ -2,7 +2,7 @@ use bevy::{color::palettes::css, math::VectorSpace, prelude::*};
 use bevy_ascii_terminal::*;
 use noise::{
     utils::{NoiseMapBuilder, PlaneMapBuilder},
-    Fbm, MultiFractal,
+    Fbm, MultiFractal, Perlin,
 };
 use sark_pathfinding::*;
 
@@ -166,7 +166,7 @@ fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingS
 }
 
 fn build_walls(walls: &mut PathMap2d) {
-    let fbm = Fbm::new()
+    let fbm = Fbm::<Perlin>::default()
         .set_octaves(16)
         .set_frequency(1.5)
         .set_lacunarity(3.0)
