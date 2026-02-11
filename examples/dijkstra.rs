@@ -94,14 +94,10 @@ fn setup(mut commands: Commands, mut pathmap: ResMut<PathMap>) {
 
 fn input(
     key: Res<ButtonInput<KeyCode>>,
-    mut q_player: Query<&mut Position, With<Player>>,
+    mut player: Single<&mut Position, With<Player>>,
     mut show: ResMut<ShowMap>,
     mut pathmap: ResMut<PathMap>,
 ) {
-    let Ok(mut player) = q_player.get_single_mut() else {
-        return;
-    };
-
     if key.just_pressed(KeyCode::Tab) {
         *show = match *show {
             ShowMap::No => ShowMap::ColorsAndNumbers,
@@ -159,11 +155,10 @@ fn player_moved(q_player: Query<&Position, (With<Player>, Changed<Position>)>) -
 }
 
 fn update_fearmap(
-    q_player: Query<&Position, With<Player>>,
+    player: Single<&Position, With<Player>>,
     pathmap: Res<PathMap>,
     mut fearmap: ResMut<BehaviorMap>,
 ) {
-    let player = q_player.single();
     fearmap.0.clear_all();
     fearmap.0.add_goal(player.0, 0.0);
     fearmap.recalculate(&pathmap.0);
@@ -174,23 +169,20 @@ fn update_fearmap(
 fn move_goblin(
     fearmap: Res<BehaviorMap>,
     pathing: ResMut<PathMap>,
-    mut q_goblin: Query<&mut Position, With<Goblin>>,
+    mut goblin: Single<&mut Position, With<Goblin>>,
 ) {
-    let mut goblin = q_goblin.single_mut();
     if let Some(next) = fearmap.next_lowest(goblin.0, &pathing.0) {
         goblin.0 = next;
     }
 }
 
 fn draw(
-    mut q_term: Query<&mut Terminal>,
+    mut term: Single<&mut Terminal>,
     pathmap: Res<PathMap>,
     fearmap: Res<BehaviorMap>,
     show: Res<ShowMap>,
     q_renderables: Query<(&Renderable, &Position)>,
 ) {
-    let mut term = q_term.single_mut();
-
     for x in 0..pathmap.width() {
         for y in 0..pathmap.height() {
             let t = if pathmap.is_obstacle([x, y]) {
