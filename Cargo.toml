@@ -16,11 +16,11 @@ arrayvec = "0.7.2"
 sark_grids = "0.7.0"
 
 [dev-dependencies.bevy]
-version = "0.17.3"
+version = "0.18.0"
 default-features = false
 features = ["png", "bevy_winit", "bevy_render", "x11"]
 
 [dev-dependencies]
 noise = "0.9.0"
-rand = "0.8.5"
-bevy_ascii_terminal = "0.18.1"
+rand = "0.9"
+bevy_ascii_terminal = "0.18.2"
