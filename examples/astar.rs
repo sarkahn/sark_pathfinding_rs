@@ -1,10 +1,12 @@
+use std::time::Instant;
+
 use bevy::{color::palettes::css, math::VectorSpace, prelude::*};
 use bevy_ascii_terminal::*;
 use noise::{
     utils::{NoiseMapBuilder, PlaneMapBuilder},
     Fbm, MultiFractal,
 };
-use sark_pathfinding::*;
+use sark_pathfinding::{grid::SizedGrid, *};
 
 pub const START_COLOR: LinearRgba = LinearRgba::BLUE;
 pub const END_COLOR: LinearRgba = LinearRgba::GREEN;
@@ -54,19 +56,15 @@ fn setup(mut commands: Commands) {
 
 fn input(
     input: Res<ButtonInput<MouseButton>>,
-    q_cam: Query<&TerminalCamera>,
-    q_term: Query<&TerminalTransform>,
+    cam: Single<&TerminalCamera>,
+    term: Single<&TerminalTransform>,
     mut map: ResMut<PathMap>,
     mut path: ResMut<PathingState>,
 ) {
-    let Some(cursor) = q_cam.get_single().ok().and_then(|c| c.cursor_world_pos()) else {
+    let Some(cursor) = cam.cursor_world_pos() else {
         return;
     };
-    let Some(xy) = q_term
-        .get_single()
-        .ok()
-        .and_then(|t| t.world_to_tile(cursor))
-    else {
+    let Some(xy) = term.world_to_tile(cursor) else {
         return;
     };
 
@@ -96,21 +94,19 @@ fn update_path(map: Res<PathMap>, mut pstate: ResMut<PathingState>) {
     }
 
     if let (Some(start), Some(end)) = (pstate.start, pstate.end) {
-        let time = bevy::utils::Instant::now();
+        let time = Instant::now();
         pstate.finder.astar(&map.0, start, end);
         pstate.time = time.elapsed().as_secs_f32();
     }
 }
 
-fn draw(mut q_term: Query<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingState>) {
+fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingState>) {
     if !map.is_changed() && !pstate.is_changed() {
         return;
     }
 
-    let mut term = q_term.single_mut();
-
-    for (i, tile) in (0..map.tile_count()).zip(term.tiles_mut()) {
-        match map.obstacle_grid().value_from_index(i) {
+    for (i, tile) in (0..map.area()).zip(term.iter_mut()) {
+        match map.obstacle_grid().get_index(i) {
             true => *tile = WALL_TILE,
             false => *tile = FLOOR_TILE,
         };
@@ -184,12 +180,12 @@ fn build_walls(walls: &mut PathMap2d) {
     let threshold = 0.1;
 
     let w = walls.width();
-    for i in 0..walls.tile_count() {
+    for i in 0..walls.area() {
         let x = i % w;
         let y = i / w;
 
         let v = plane.get_value(x, y);
-        walls.set_obstacle([x, y], v >= threshold);
+        walls.set_obstacle([x as i32, y as i32], v >= threshold);
     }
 }
 

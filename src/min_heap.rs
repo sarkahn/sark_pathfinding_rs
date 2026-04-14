@@ -1,7 +1,6 @@
 //! A minheap that stores positions with a cost.
 
 use glam::IVec2;
-use sark_grids::GridPoint;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
@@ -14,7 +13,7 @@ use std::collections::BinaryHeap;
 /// heap.push([10,10], 5);
 /// heap.push([1,1], 2);
 /// heap.push([15,15], -1);
-/// heap.push([33,33], 6);;
+/// heap.push([33,33], 6);
 /// heap.push([7,7], 1);
 /// assert_eq!(heap.pop().unwrap().to_array(), [15,15]);
 /// ```
@@ -40,10 +39,10 @@ impl MinHeap {
         self.heap.clear();
     }
 
-    pub fn push(&mut self, xy: impl GridPoint, cost: i32) {
+    pub fn push(&mut self, xy: impl Into<IVec2>, cost: i32) {
         self.heap.push(Cell {
             cost,
-            pos: xy.to_ivec2(),
+            pos: xy.into(),
         });
     }
 

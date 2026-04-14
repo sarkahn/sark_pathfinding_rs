@@ -2,7 +2,6 @@
 
 use ahash::{HashMap, HashMapExt};
 use glam::IVec2;
-use sark_grids::GridPoint;
 use std::collections::hash_map::Entry;
 
 use crate::{min_heap::MinHeap, pathmap::PathMap};
@@ -65,12 +64,12 @@ impl Pathfinder {
     pub fn astar(
         &mut self,
         map: &impl PathMap,
-        start: impl GridPoint,
-        goal: impl GridPoint,
+        start: impl Into<IVec2>,
+        goal: impl Into<IVec2>,
     ) -> Option<&[IVec2]> {
         self.clear();
-        let start = start.to_ivec2();
-        let goal = goal.to_ivec2();
+        let start = start.into();
+        let goal = goal.into();
         self.frontier.push(start, 0);
         self.costs.insert(start, 0);
 
@@ -102,19 +101,19 @@ impl Pathfinder {
     /// Afterwards, a path can be retrieved via [Pathfinder::build_path].
     ///
     /// Note this is seperate from [crate::DijkstraMap] which is used for calculating
-    /// the a path to the most valuable goal on a grid.
+    /// a path to the most valuable goal on a grid.
     ///
     /// [Dijkstra's Algorithm]: https://www.redblobgames.com/pathfinding/a-star/introduction.html#dijkstra
     pub fn dijkstra(
         &mut self,
         map: &impl PathMap,
-        start: Option<impl GridPoint>,
-        goal: impl GridPoint,
+        start: Option<impl Into<IVec2>>,
+        goal: impl Into<IVec2>,
     ) {
         self.clear();
 
-        let start = start.map(|s| s.to_ivec2());
-        let goal = goal.to_ivec2();
+        let start = start.map(|s| s.into());
+        let goal = goal.into();
 
         let p = start.unwrap_or(goal);
         self.frontier.push(p, 0);
@@ -144,11 +143,16 @@ impl Pathfinder {
     /// Afterwards, a path can be retrieved via [Pathfinder::build_path].
     ///
     /// [Breadth First Search]: https://www.redblobgames.com/pathfinding/a-star/introduction.html#breadth-first-search
-    pub fn bfs(&mut self, map: &impl PathMap, start: Option<impl GridPoint>, goal: impl GridPoint) {
+    pub fn bfs(
+        &mut self,
+        map: &impl PathMap,
+        start: Option<impl Into<IVec2>>,
+        goal: impl Into<IVec2>,
+    ) {
         self.clear();
 
-        let start = start.map(|s| s.to_ivec2());
-        let goal = goal.to_ivec2();
+        let start = start.map(|s| s.into());
+        let goal = goal.into();
 
         let p = start.unwrap_or(goal);
         self.frontier.push(p, 0);
@@ -178,9 +182,13 @@ impl Pathfinder {
     /// Returns the constructed path as a slice, or [None] if no pathfinding
     /// functions have been run or if no valid path exists between the given
     /// points.
-    pub fn build_path(&mut self, start: impl GridPoint, goal: impl GridPoint) -> Option<&[IVec2]> {
-        let mut curr = goal.to_ivec2();
-        let start = start.to_ivec2();
+    pub fn build_path(
+        &mut self,
+        start: impl Into<IVec2>,
+        goal: impl Into<IVec2>,
+    ) -> Option<&[IVec2]> {
+        let mut curr = goal.into();
+        let start = start.into();
         self.path.clear();
         self.path.push(curr);
         while let Some(next) = self.came_from.get(&curr) {

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_ascii_terminal::*;
-use sark_pathfinding::*;
+use sark_pathfinding::{grid::SizedGrid, *};
 
 const MAP_STRING: &str = "
 ########################################
@@ -9,9 +9,9 @@ const MAP_STRING: &str = "
 #                #############         #
 #                #############         #
 #                #############         #
-#                #############         #
+#     G          #############         #
 #                           ##         #
-#                ##########            #
+#                ##########         G  #
 #                #############         #
 #                ################## ####
 ######  ########################### ####
@@ -23,10 +23,12 @@ const MAP_STRING: &str = "
 ####   ############# ###################
 ####   ###########     #################
 ####   #############    ################
-###        ######    #    ##############
+###  @     ######    #  G ##############
 ####   ### ###### ######   #############
 ##########        #######   ############
 ########################################";
+
+const FEAR_FACTOR: f32 = 1.2;
 
 #[derive(Resource, Deref, DerefMut)]
 pub struct PathMap(PathMap2d);
@@ -46,9 +48,8 @@ pub struct Goblin;
 #[derive(Component)]
 pub struct Player;
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub enum ShowMap {
-    #[default]
     No,
     ColorsAndNumbers,
     ColorsOnly,
@@ -58,17 +59,16 @@ pub const WALL_TILE: Tile = Tile::new('#', color::WHITE, color::BLACK);
 pub const FLOOR_TILE: Tile = Tile::new('.', color::DARK_GRAY, color::BLACK);
 pub const PLAYER_TILE: Tile = Tile::new('@', color::BLANCHED_ALMOND, color::BLACK);
 pub const GOB_TILE: Tile = Tile::new('g', color::DARK_GREEN, color::BLACK);
-pub const PLAYER_SPAWN_POS: IVec2 = IVec2::new(9, 17);
-pub const GOB_SPAWN_POS: IVec2 = IVec2::new(15, 14);
 
 fn main() {
     let pathmap = PathMap2d::from_string(MAP_STRING, '#').unwrap();
     let fearmap = DijkstraMap::new(pathmap.size());
+
     App::new()
         .add_plugins((DefaultPlugins, TerminalPlugins))
         .insert_resource(BehaviorMap(fearmap))
         .insert_resource(PathMap(pathmap))
-        .insert_resource(ShowMap::default())
+        .insert_resource(ShowMap::No)
         .add_systems(Startup, setup)
         .add_systems(
             Update,
@@ -86,22 +86,54 @@ fn main() {
 fn setup(mut commands: Commands, mut pathmap: ResMut<PathMap>) {
     commands.spawn(Terminal::new(pathmap.size()));
     commands.spawn(TerminalCamera::new());
-    commands.spawn((Player, Position(PLAYER_SPAWN_POS), Renderable(PLAYER_TILE)));
-    pathmap.0.add_obstacle(PLAYER_SPAWN_POS);
-    commands.spawn((Goblin, Position(GOB_SPAWN_POS), Renderable(GOB_TILE)));
-    pathmap.0.add_obstacle(GOB_SPAWN_POS);
+
+    let w = pathmap.width() as i32;
+    let h = pathmap.height() as i32;
+
+    let to_world_pos =
+        |char_index: usize| IVec2::new(char_index as i32 % w, h - 1 - (char_index as i32 / w));
+
+    let player_pos = MAP_STRING
+        .chars()
+        .filter(|c| *c != '\n')
+        .enumerate()
+        .filter_map(|(i, c)| {
+            if c != '@' {
+                None
+            } else {
+                Some(to_world_pos(i))
+            }
+        })
+        .next()
+        .expect("Couldn't find player @");
+
+    commands.spawn((Player, Position(player_pos), Renderable(PLAYER_TILE)));
+    pathmap.0.add_obstacle(player_pos);
+
+    let goblin_positions = MAP_STRING
+        .chars()
+        .filter(|c| *c != '\n')
+        .enumerate()
+        .filter_map(|(i, c)| {
+            if c != 'G' {
+                None
+            } else {
+                Some(to_world_pos(i))
+            }
+        });
+
+    for p in goblin_positions {
+        commands.spawn((Goblin, Position(p), Renderable(GOB_TILE)));
+        pathmap.0.add_obstacle(p);
+    }
 }
 
 fn input(
     key: Res<ButtonInput<KeyCode>>,
-    mut q_player: Query<&mut Position, With<Player>>,
+    mut player_pos: Single<&mut Position, With<Player>>,
     mut show: ResMut<ShowMap>,
     mut pathmap: ResMut<PathMap>,
 ) {
-    let Ok(mut player) = q_player.get_single_mut() else {
-        return;
-    };
-
     if key.just_pressed(KeyCode::Tab) {
         *show = match *show {
             ShowMap::No => ShowMap::ColorsAndNumbers,
@@ -146,12 +178,12 @@ fn input(
     if movement.cmpeq(IVec2::ZERO).all() {
         return;
     }
-    let next = player.0 + movement;
-    if !pathmap.in_bounds(next) || pathmap.is_obstacle(next) {
+    let next = player_pos.0 + movement;
+    if !pathmap.contains_point(next) || pathmap.is_obstacle(next) {
         return;
     }
-    pathmap.0.move_obstacle(player.0, next);
-    player.0 = next;
+    pathmap.0.move_obstacle(player_pos.0, next);
+    player_pos.0 = next;
 }
 
 fn player_moved(q_player: Query<&Position, (With<Player>, Changed<Position>)>) -> bool {
@@ -159,40 +191,39 @@ fn player_moved(q_player: Query<&Position, (With<Player>, Changed<Position>)>) -
 }
 
 fn update_fearmap(
-    q_player: Query<&Position, With<Player>>,
+    player: Single<&Position, With<Player>>,
     pathmap: Res<PathMap>,
     mut fearmap: ResMut<BehaviorMap>,
 ) {
-    let player = q_player.single();
     fearmap.0.clear_all();
     fearmap.0.add_goal(player.0, 0.0);
     fearmap.recalculate(&pathmap.0);
-    fearmap.apply_operation(|f| f * -1.2);
+    fearmap.apply_operation(|f| f * -FEAR_FACTOR);
     fearmap.recalculate(&pathmap.0);
 }
 
 fn move_goblin(
     fearmap: Res<BehaviorMap>,
-    pathing: ResMut<PathMap>,
+    mut pathing: ResMut<PathMap>,
     mut q_goblin: Query<&mut Position, With<Goblin>>,
 ) {
-    let mut goblin = q_goblin.single_mut();
-    if let Some(next) = fearmap.next_lowest(goblin.0, &pathing.0) {
-        goblin.0 = next;
+    for mut goblin in &mut q_goblin {
+        if let Some(next) = fearmap.next_lowest(goblin.0, &pathing.0) {
+            pathing.move_obstacle(goblin.0, next);
+            goblin.0 = next;
+        }
     }
 }
 
 fn draw(
-    mut q_term: Query<&mut Terminal>,
+    mut term: Single<&mut Terminal>,
     pathmap: Res<PathMap>,
     fearmap: Res<BehaviorMap>,
     show: Res<ShowMap>,
     q_renderables: Query<(&Renderable, &Position)>,
 ) {
-    let mut term = q_term.single_mut();
-
-    for x in 0..pathmap.width() {
-        for y in 0..pathmap.height() {
+    for x in 0..pathmap.width() as i32 {
+        for y in 0..pathmap.height() as i32 {
             let t = if pathmap.is_obstacle([x, y]) {
                 WALL_TILE
             } else {
@@ -204,16 +235,16 @@ fn draw(
 
     if !matches!(*show, ShowMap::No) {
         for (p, v) in fearmap.iter_xy() {
-            let distance = v as i32;
+            let distance = *v as i32;
             let digit_value = distance.abs() % 62; // 0-61 for 0-9, a-z, A-Z
 
             let distance_char = match *show {
                 ShowMap::No => unreachable!(),
                 ShowMap::ColorsAndNumbers => match digit_value {
                     0..=9 => (b'0' + digit_value as u8) as char, // 0-9
-                    10..=35 => (b'a' + (digit_value - 10) as u8) as char, // Far
-                    36..=61 => (b'A' + (digit_value - 36) as u8) as char, // Pretty far
-                    _ => '-',                                    // Very far
+                    10..=35 => (b'a' + (digit_value - 10) as u8) as char,
+                    36..=61 => (b'A' + (digit_value - 36) as u8) as char,
+                    _ => '-',
                 },
                 ShowMap::ColorsOnly => ' ',
             };

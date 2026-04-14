@@ -1,6 +1,5 @@
 [package]
 name = "sark_pathfinding"
-version = "0.4.0"
 edition = "2021"
 homepage = "https://github.com/sarkahn/sark_pathfinding_rs"
 repository = "https://github.com/sarkahn/sark_pathfinding_rs"
@@ -8,19 +7,20 @@ license = "MIT"
 readme = "README.md"
 description = "A simple implementation of the astar pathfinding algorthim from red blob games https://www.redblobgames.com/pathfinding/a-star/implementation.html and 'Dijkstra Maps' from https://www.roguebasin.com/index.php/Dijkstra_Maps_Visualized"
 keywords = ["bevy", "pathfinding", "2d", "astar"]
+version = "0.5.0-dev"
 
 [dependencies]
-glam = "0.29"
+glam = "0.30.7"
 ahash = "0.8.7"
 arrayvec = "0.7.2"
-sark_grids = "0.6"
-
-[dev-dependencies.bevy]
-version = "0.15"
-default-features = false
-features = ["png", "bevy_winit", "bevy_render"]
+bit-vec = "0.9.1"
 
 [dev-dependencies]
 noise = "0.7.0"
 rand = "0.8.5"
-bevy_ascii_terminal = "0.16"
+bevy_ascii_terminal = "0.18"
+
+[dev-dependencies.bevy]
+version = "0.18"
+default-features = false
+features = ["bevy_winit", "bevy_render"]
