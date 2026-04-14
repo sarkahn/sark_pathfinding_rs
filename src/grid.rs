@@ -108,11 +108,4 @@ pub trait Grid<T>: SizedGrid {
         let i = self.xy_to_index(xy);
         self.get_mut_from_index(i)
     }
-
-    fn set_all(&mut self, value: T)
-    where
-        T: Copy,
-    {
-        self.iter_mut().for_each(|v| *v = value);
-    }
 }

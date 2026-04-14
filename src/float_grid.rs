@@ -24,6 +24,7 @@ impl FloatGrid {
     pub fn values(&self) -> &[f32] {
         &self.data
     }
+
     pub fn values_mut(&mut self) -> &mut [f32] {
         &mut self.data
     }
@@ -38,6 +39,10 @@ impl FloatGrid {
     /// Reset all values in the [FloatGrid] to 0.
     pub fn clear(&mut self) {
         self.data.fill(0.0);
+    }
+
+    pub fn set_all(&mut self, v: f32) {
+        self.data.fill(v);
     }
 }
 
@@ -75,6 +80,13 @@ impl<P: Into<IVec2>> std::ops::Index<P> for FloatGrid {
     type Output = f32;
 
     fn index(&self, xy: P) -> &Self::Output {
+        let xy = xy.into();
+        debug_assert!(
+            self.contains_point(xy),
+            "Position {} is out of bounds {}",
+            xy,
+            self.size
+        );
         let i = self.xy_to_index(xy);
         &self.data[i]
     }
@@ -82,6 +94,13 @@ impl<P: Into<IVec2>> std::ops::Index<P> for FloatGrid {
 
 impl<P: Into<IVec2>> std::ops::IndexMut<P> for FloatGrid {
     fn index_mut(&mut self, xy: P) -> &mut Self::Output {
+        let xy = xy.into();
+        debug_assert!(
+            self.contains_point(xy),
+            "Position {} is out of bounds {}",
+            xy,
+            self.size
+        );
         let i = self.xy_to_index(xy);
         &mut self.data[i]
     }

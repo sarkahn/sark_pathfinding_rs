@@ -31,14 +31,15 @@ impl BitGrid {
     /// Retrieve the value of a bit at the given 2d index.
     #[inline]
     pub fn get(&self, xy: impl Into<IVec2>) -> bool {
+        let xy = xy.into();
         let i = self.xy_to_index(xy);
-        self.get_index(i)
+        self.bits[i]
     }
 
-    /// Retrieve the value of the bit at the given index.
+    /// Retrieve the value of the bit at the given index
     #[inline]
     pub fn get_index(&self, i: usize) -> bool {
-        self.bits.get(i).unwrap()
+        self.bits[i]
     }
 
     #[inline]
@@ -51,7 +52,6 @@ impl BitGrid {
         self.set(xy, false);
     }
 
-    /// Set the bit at the given 2d index.
     #[inline]
     pub fn set(&mut self, xy: impl Into<IVec2>, value: bool) {
         let i = self.xy_to_index(xy);
@@ -86,7 +86,7 @@ impl BitGrid {
     /// Toggle the value of the bit at the given index.
     #[inline]
     pub fn toggle_index(&mut self, i: usize) {
-        let v = self.bits.get(i).unwrap();
+        let v = self.bits[i];
         self.bits.set(i, !v);
     }
 
@@ -137,6 +137,30 @@ impl BitGrid {
 impl SizedGrid for BitGrid {
     fn size(&self) -> UVec2 {
         self.size
+    }
+}
+
+static TRUE: bool = true;
+static FALSE: bool = false;
+
+impl<P: Into<IVec2>> std::ops::Index<P> for BitGrid {
+    type Output = bool;
+
+    #[inline]
+    fn index(&self, xy: P) -> &bool {
+        let xy = xy.into();
+        debug_assert!(
+            self.contains_point(xy),
+            "Position {} is out of bounds {}",
+            xy,
+            self.size
+        );
+        let i = self.xy_to_index(xy);
+        if self.bits[i] {
+            &TRUE
+        } else {
+            &FALSE
+        }
     }
 }
 

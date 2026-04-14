@@ -45,12 +45,10 @@ const EXIT_CAP: usize = 8;
 pub struct DijkstraMap {
     value_grid: FloatGrid,
     goals: HashSet<IVec2>,
-    /// Obstacles populated during map recalculation. This is only used
-    /// when iterating over map values on an already calculated map to skip
-    /// 'obstacles'.
+    /// Obstacles are only ever populated during recalculation by the provided
+    /// path map and are only used during iteration to skip obtacles.
     obstacles: BitGrid,
     frontier: MinHeap,
-    size: UVec2,
     initial_value: f32,
 }
 
@@ -64,7 +62,6 @@ impl DijkstraMap {
             goals: HashSet::new(),
             frontier: MinHeap::with_capacity(size.element_product() as usize),
             obstacles: BitGrid::new(size),
-            size,
             initial_value: INITIAL_VALUE,
         }
     }
@@ -115,7 +112,6 @@ impl DijkstraMap {
             goals,
             obstacles,
             frontier: MinHeap::with_capacity(size.element_product() as usize),
-            size,
             initial_value: INITIAL_VALUE,
         })
     }
@@ -155,8 +151,8 @@ impl DijkstraMap {
         self.obstacles.set_all(true);
         self.frontier.clear();
 
-        for i in 0..self.size.element_product() as usize {
-            let w = self.size.x as i32;
+        for i in 0..self.size().element_product() as usize {
+            let w = self.width() as i32;
             let xy = IVec2::new(i as i32 % w, i as i32 / w);
             if !self.goals.contains(&xy) && pathing.is_obstacle(xy) {
                 continue;
@@ -313,8 +309,8 @@ impl DijkstraMap {
     }
 
     pub fn print_grid_values(&self) {
-        for y in (0..self.size.y).rev() {
-            for x in 0..self.size.x {
+        for y in (0..self.height()).rev() {
+            for x in 0..self.width() {
                 let p = IVec2::new(x as i32, y as i32);
                 let v = self.value_grid[p];
                 if v.abs() >= 999.0 {
@@ -332,7 +328,7 @@ impl DijkstraMap {
 
 impl SizedGrid for DijkstraMap {
     fn size(&self) -> UVec2 {
-        self.size
+        self.value_grid.size()
     }
 }
 
