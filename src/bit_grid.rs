@@ -23,7 +23,7 @@ impl BitGrid {
     }
 
     /// Set the initial value for all bits.
-    pub fn with_value(mut self, value: bool) -> Self {
+    pub fn with_all(mut self, value: bool) -> Self {
         self.set_all(value);
         self
     }

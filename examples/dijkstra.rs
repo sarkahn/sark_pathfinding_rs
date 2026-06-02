@@ -55,10 +55,10 @@ pub enum ShowMap {
     ColorsOnly,
 }
 
-pub const WALL_TILE: Tile = Tile::new('#', color::WHITE, color::BLACK);
-pub const FLOOR_TILE: Tile = Tile::new('.', color::DARK_GRAY, color::BLACK);
-pub const PLAYER_TILE: Tile = Tile::new('@', color::BLANCHED_ALMOND, color::BLACK);
-pub const GOB_TILE: Tile = Tile::new('g', color::DARK_GREEN, color::BLACK);
+pub const WALL_TILE: Tile = Tile::new('#', color::css::WHITE, color::css::BLACK);
+pub const FLOOR_TILE: Tile = Tile::new('.', color::css::DARK_GRAY, color::css::BLACK);
+pub const PLAYER_TILE: Tile = Tile::new('@', color::css::BLANCHED_ALMOND, color::css::BLACK);
+pub const GOB_TILE: Tile = Tile::new('g', color::css::DARK_GREEN, color::css::BLACK);
 
 fn main() {
     let pathmap = PathMap2d::from_string(MAP_STRING, '#').unwrap();
@@ -76,7 +76,7 @@ fn main() {
                 input,
                 move_goblin.run_if(player_moved),
                 update_fearmap.run_if(player_moved),
-                draw.run_if(player_moved.or(resource_changed::<ShowMap>)),
+                draw.run_if(player_moved.or_else(resource_changed::<ShowMap>)),
             )
                 .chain(),
         )
@@ -165,6 +165,7 @@ fn input(
         KeyCode::KeyZ,
         KeyCode::KeyX,
         KeyCode::KeyC,
+        KeyCode::KeyS,
     ]) as i32);
     let right = key.any_just_pressed([
         KeyCode::Numpad3,
@@ -222,6 +223,8 @@ fn draw(
     show: Res<ShowMap>,
     q_renderables: Query<(&Renderable, &Position)>,
 ) {
+    term.set_pivot(Pivot::LeftBottom);
+
     for x in 0..pathmap.width() as i32 {
         for y in 0..pathmap.height() as i32 {
             let t = if pathmap.is_obstacle([x, y]) {
@@ -249,7 +252,7 @@ fn draw(
                 ShowMap::ColorsOnly => ' ',
             };
 
-            let fg = color::BLACK;
+            let fg = color::css::BLACK;
             let bg: LinearRgba = Hsva::new(
                 180.0 + (distance.abs() as f32 / 40.0) * 180.0,
                 1.0,
@@ -267,9 +270,10 @@ fn draw(
         term.put_tile(p.0, r.0);
     }
 
-    term.put_string([0, 0], "Move with 'xwadqezc' or 'numpad' ".clear_colors());
+    term.set_pivot(Pivot::LeftTop);
+    term.put_string([0, 0], "Move with 'xwadqezc' or 'numpad' ");
     term.put_string(
         [0, 1],
-        "Toggle Map Visualization with 'Tab' ".clear_colors(),
+        "Toggle Map Visualization with 'Tab' ",
     );
 }

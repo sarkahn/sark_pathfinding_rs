@@ -64,6 +64,7 @@ fn input(
     let Some(cursor) = cam.cursor_world_pos() else {
         return;
     };
+
     let Some(xy) = term.world_to_tile(cursor) else {
         return;
     };
@@ -105,12 +106,15 @@ fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingS
         return;
     }
 
+
     for (i, tile) in (0..map.area()).zip(term.iter_mut()) {
         match map.obstacle_grid().get_index(i) {
             true => *tile = WALL_TILE,
             false => *tile = FLOOR_TILE,
         };
     }
+
+    term.set_pivot(Pivot::LeftBottom);
 
     for p in pstate.finder.visited() {
         let glyph = match map.is_obstacle(*p) {
@@ -130,8 +134,9 @@ fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingS
             let col = LinearRgba::lerp(START_COLOR, END_COLOR, t);
             term.put_char(*p, '█').fg(col);
         }
+
         term.put_string(
-            [0, 2],
+            [0, 2].pivot(Pivot::LeftTop),
             format!(
                 "Found path in {} ms. Length {}. Visited {} nodes.         ",
                 pstate.time,
@@ -141,7 +146,7 @@ fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingS
             .fg(fg),
         );
     } else {
-        term.put_string([0, 2], "No valid path found                      ".fg(fg));
+        term.put_string([0, 2].pivot(Pivot::LeftTop), "No valid path found                      ".fg(fg));
     }
 
     if let Some(start) = pstate.start {
@@ -153,6 +158,7 @@ fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingS
         term.put_char(end, 'E');
     }
 
+    term.set_pivot(Pivot::LeftTop);
     term.put_string(
         [0, 0],
         "Left Click to toggle walls                  ".fg(fg),

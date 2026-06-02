@@ -232,6 +232,10 @@ impl Pathfinder {
     pub fn path(&self) -> &[IVec2] {
         &self.path
     }
+
+    pub fn take_path(self) -> Vec<IVec2> {
+        self.path
+    }
 }
 
 #[cfg(test)]

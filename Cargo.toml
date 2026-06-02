@@ -1,6 +1,6 @@
 [package]
 name = "sark_pathfinding"
-edition = "2021"
+edition = "2024"
 homepage = "https://github.com/sarkahn/sark_pathfinding_rs"
 repository = "https://github.com/sarkahn/sark_pathfinding_rs"
 license = "MIT"
@@ -10,17 +10,22 @@ keywords = ["bevy", "pathfinding", "2d", "astar"]
 version = "0.5.0-dev"
 
 [dependencies]
-glam = "0.30.7"
+glam = "0.32.0"
 ahash = "0.8.7"
 arrayvec = "0.7.2"
 bit-vec = "0.9.1"
 
 [dev-dependencies]
 noise = "0.7.0"
-rand = "0.8.5"
-bevy_ascii_terminal = "0.18"
+rand = "0.10.0"
 
-[dev-dependencies.bevy]
-version = "0.18"
+[dependencies.bevy]
+git = "https://github.com/bevyengine/bevy"
+rev = "99d2e972d06a3a688aa1ebca6ce5759d784821c5"
 default-features = false
-features = ["bevy_winit", "bevy_render"]
+features = ["bevy_render", "bevy_winit", "x11"]
+
+[dependencies.bevy_ascii_terminal]
+git = "https://github.com/sarkahn/bevy_ascii_terminal"
+rev = "071725307e0b1a93e87f499f26d532fa27717834"
+
