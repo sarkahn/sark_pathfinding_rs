@@ -33,12 +33,14 @@ pub trait PathMap {
 ///
 /// let path = pf.astar(&map, [4,4], [10,10]).unwrap();
 /// ```
+#[derive(Default, Debug, Clone)]
 pub struct PathMap2d {
     pub adjacency: Adjacency,
-    obstacles: BitGrid,
+    pub obstacles: BitGrid,
 }
 
 /// Defines how the grid handles movement between adjacent tiles.
+#[derive(Debug, Clone)]
 pub enum Adjacency {
     /// Grid allows for 4-way movement.
     Cardinal,
@@ -117,18 +119,6 @@ impl PathMap2d {
     pub fn move_obstacle(&mut self, old_pos: impl Into<IVec2>, new_pos: impl Into<IVec2>) {
         self.obstacles.set(old_pos, false);
         self.obstacles.set(new_pos, true);
-    }
-
-    /// A reference to the underlying bit grid that stores the [PathMap2d]'s
-    /// obstacle data.
-    pub fn obstacle_grid(&self) -> &BitGrid {
-        &self.obstacles
-    }
-
-    /// A mutable reference to the underlying bit grid that stores the
-    /// [PathMap2d]'s obstacle data.
-    pub fn obstacle_grid_mut(&mut self) -> &mut BitGrid {
-        &mut self.obstacles
     }
 
     pub fn print_grid(&self) {
@@ -254,7 +244,7 @@ pub fn octile_heuristic(
     cardinal_cost: i32,
     diagonal_cost: i32,
 ) -> i32 {
-    let tcmd = 2 * cardinal_cost - diagonal_cost;
+    let tcmd: i32 = 2 * cardinal_cost - diagonal_cost;
     let d = (a.into() - b.into()).abs();
     (tcmd * (d.x - d.y).abs() + diagonal_cost * (d.x + d.y)) / 2
 }

@@ -156,11 +156,7 @@ impl<P: Into<IVec2>> std::ops::Index<P> for BitGrid {
             self.size
         );
         let i = self.xy_to_index(xy);
-        if self.bits[i] {
-            &TRUE
-        } else {
-            &FALSE
-        }
+        if self.bits[i] { &TRUE } else { &FALSE }
     }
 }
 

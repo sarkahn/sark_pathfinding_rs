@@ -3,8 +3,8 @@ use std::time::Instant;
 use bevy::{color::palettes::css, math::VectorSpace, prelude::*};
 use bevy_ascii_terminal::*;
 use noise::{
-    utils::{NoiseMapBuilder, PlaneMapBuilder},
     Fbm, MultiFractal,
+    utils::{NoiseMapBuilder, PlaneMapBuilder},
 };
 use sark_pathfinding::{grid::SizedGrid, *};
 
@@ -106,9 +106,8 @@ fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingS
         return;
     }
 
-
     for (i, tile) in (0..map.area()).zip(term.iter_mut()) {
-        match map.obstacle_grid().get_index(i) {
+        match map.obstacles.get_index(i) {
             true => *tile = WALL_TILE,
             false => *tile = FLOOR_TILE,
         };
@@ -146,7 +145,10 @@ fn draw(mut term: Single<&mut Terminal>, map: Res<PathMap>, pstate: Res<PathingS
             .fg(fg),
         );
     } else {
-        term.put_string([0, 2].pivot(Pivot::LeftTop), "No valid path found                      ".fg(fg));
+        term.put_string(
+            [0, 2].pivot(Pivot::LeftTop),
+            "No valid path found                      ".fg(fg),
+        );
     }
 
     if let Some(start) = pstate.start {
