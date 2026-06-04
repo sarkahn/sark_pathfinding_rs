@@ -132,6 +132,12 @@ impl BitGrid {
             .enumerate()
             .map(move |(i, b)| (IVec2::new(i as i32 % w, i as i32 / w), b))
     }
+
+    pub fn resize(&mut self, size: UVec2) {
+        self.size = size;
+        self.bits.remove_all();
+        self.bits.grow(size.element_product() as usize, false);
+    }
 }
 
 impl SizedGrid for BitGrid {
