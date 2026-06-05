@@ -91,6 +91,45 @@ impl Pathfinder {
         self.build_path(start, goal)
     }
 
+    //     /// Returns an iterator of the valid exits from the given grid point.
+    // fn exits(&self, p: impl Into<IVec2>) -> Self::ExitIterator;
+    // /// The cost of moving between two grid points.
+    // fn cost(&self, a: impl Into<IVec2>, b: impl Into<IVec2>) -> i32;
+    // /// The distance between two grid points.
+    // fn distance(&self, a: impl Into<IVec2>, b: impl Into<IVec2>) -> i32;
+    // fn is_obstacle(&self, p: impl Into<IVec2>) -> bool;
+
+    pub fn astar_fn<T: Iterator<Item = IVec2>>(
+        &mut self,
+        start: impl Into<IVec2>,
+        goal: impl Into<IVec2>,
+        cost: impl Fn(IVec2, IVec2) -> i32,
+        dist: impl Fn(IVec2, IVec2) -> i32,
+        exits: impl Fn(IVec2) -> T,
+    ) -> Option<&[IVec2]> {
+        self.clear();
+        let start = start.into();
+        let goal = goal.into();
+        self.frontier.push(start, 0);
+        self.costs.insert(start, 0);
+
+        while let Some(curr) = self.frontier.pop() {
+            if curr == goal {
+                break;
+            }
+
+            for next in exits(curr) {
+                let new_cost = self.costs[&curr] + cost(curr, next);
+                if !self.costs.contains_key(&next) || new_cost < self.costs[&next] {
+                    self.costs.insert(next, new_cost);
+                    self.frontier.push(next, new_cost + dist(goal, next));
+                    self.came_from.insert(next, curr);
+                }
+            }
+        }
+        self.build_path(start, goal)
+    }
+
     /// Find a path to a goal using [Dijkstra's Algorithm]. Note that if
     /// the movement cost is uniform across your entire map then you are better
     /// off using [Pathfinder::bfs] instead as it will be faster and give
@@ -240,7 +279,10 @@ impl Pathfinder {
 
 #[cfg(test)]
 mod test {
-    use crate::PathMap2d;
+    use crate::{
+        DEFAULT_CARDINAL_COST, DEFAULT_DIAGONAL_COST, DIR_8, PathMap2d, is_cardinal,
+        octile_heuristic,
+    };
 
     use super::*;
 
@@ -290,5 +332,51 @@ mod test {
         assert_eq!(6, path.len());
         assert_eq!([9, 5], path[0].to_array());
         assert_eq!([4, 5], path[5].to_array());
+    }
+
+    #[test]
+
+    fn astar_fn_test() {
+        let mut finder = Pathfinder::new();
+
+        let w: i32 = 25;
+        let h: i32 = 25;
+
+        let index = |p: IVec2| (p.y * w + p.x) as usize;
+
+        let obstacles = vec![false; (w * h) as usize];
+
+        let obstacles_ref = &obstacles;
+        let exits = |a: IVec2| {
+            DIR_8.iter().filter_map(move |p| {
+                let next = a + *p;
+                if next.x < 0 || next.x >= w || next.y < 0 || next.y >= h {
+                    return None;
+                }
+                let i = index(next);
+                if !obstacles_ref[i] { Some(next) } else { None }
+            })
+        };
+
+        let ccost = DEFAULT_CARDINAL_COST;
+        let dcost = DEFAULT_DIAGONAL_COST;
+
+        let cost = |a: IVec2, b: IVec2| {
+            if is_cardinal(a, b) { ccost } else { dcost }
+        };
+        let dist = |a: IVec2, b: IVec2| octile_heuristic(a, b, ccost, dcost);
+
+        let start = IVec2::new(0, 0);
+        let goal = IVec2::new(4, 4);
+        let path = finder
+            .astar_fn(start, goal, cost, dist, exits)
+            .expect("Invalid path");
+
+        assert_eq!(5, path.len());
+        assert_eq!([0, 0], path[0].to_array());
+        assert_eq!([1, 1], path[1].to_array());
+        assert_eq!([2, 2], path[2].to_array());
+        assert_eq!([3, 3], path[3].to_array());
+        assert_eq!([4, 4], path[4].to_array());
     }
 }

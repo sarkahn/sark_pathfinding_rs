@@ -44,6 +44,11 @@ impl FloatGrid {
     pub fn set_all(&mut self, v: f32) {
         self.data.fill(v);
     }
+
+    pub fn resize(&mut self, new_size: UVec2) {
+        self.size = new_size;
+        self.data.resize(new_size.element_product() as usize, 0.0);
+    }
 }
 
 impl SizedGrid for FloatGrid {

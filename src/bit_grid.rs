@@ -138,6 +138,10 @@ impl BitGrid {
         self.bits.remove_all();
         self.bits.grow(size.element_product() as usize, false);
     }
+
+    pub fn len(&self) -> usize {
+        self.bits.len()
+    }
 }
 
 impl SizedGrid for BitGrid {
